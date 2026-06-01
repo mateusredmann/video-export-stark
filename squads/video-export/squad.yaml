@@ -1,0 +1,61 @@
+name: video-export
+version: 1.1.0
+short-title: Video Export
+description: >
+  Automatiza a entrega de vídeos editados: varre pasta-raiz do editor,
+  descobre pares vídeo+capa, identifica cliente pela pasta-pai, sobe
+  pro Google Drive na hierarquia padrão e comenta o link na subtarefa
+  do ClickUp marcando como "edição concluída".
+author: stark.marketing
+license: UNLICENSED
+slashPrefix: video-export
+
+aiox:
+  minVersion: "5.0.0"
+  type: squad
+
+components:
+  tasks:
+    - onboarding.md
+    - scan-pasta.md
+    - upload-drive.md
+    - notificar-clickup.md
+  agents:
+    - export-chief.md
+    - scanner.md
+    - matcher.md
+    - uploader.md
+    - notifier.md
+  workflows:
+    - export-pasta.md
+    - export-hoje.md
+    - export-semana.md
+  config:
+    - status-map.yaml
+    - clientes.yaml
+
+config:
+  extends: extend
+  cacheDir: "%USERPROFILE%\\.stark-video-export"
+  configFile: "config.json"
+
+mcps:
+  required:
+    - clickup
+    - google-drive
+  optional: []
+
+defaults:
+  videoExt: ".mp4"
+  capaExt: ".png"
+  statusFinal: "edição concluída"
+  parallelism: 4
+  mentionResponsavel: true
+
+tags:
+  - video
+  - edicao
+  - clickup
+  - drive
+  - entrega
+  - stark

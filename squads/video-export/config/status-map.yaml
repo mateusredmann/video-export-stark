@@ -1,0 +1,15 @@
+# Mapeamento de status final na ClickUp após upload bem-sucedido.
+# v1: status único pra todos os tipos.
+#
+# Se no futuro o time quiser diferenciar (ex: Reels Viral → "ENVIO PENDENTE",
+# Estático → "edição concluída"), adicionar entradas específicas por `tipo`.
+
+default:
+  status: "edição concluída"
+
+# Exemplo de override por tipo de post (não usado em v1):
+# por_tipo:
+#   "Reels Viral":
+#     status: "ENVIO PENDENTE"
+#   "Carrossel":
+#     status: "edição concluída"

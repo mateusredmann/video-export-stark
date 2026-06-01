@@ -1,0 +1,70 @@
+# Video Export — Overrides por cliente
+#
+# A maioria dos clientes não precisa de override. O Up (uploader) usa a hierarquia
+# padrão `Clientes/<cliente>/Cronograma de Conteudo/Artes/<ano>/<mês>/<DD-MM-YYYY>/`.
+#
+# Use este arquivo quando algum cliente:
+#   1. Tem pasta no Drive com nome diferente do que aparece no ClickUp / pasta local
+#   2. Tem estrutura de pastas não-padrão (precisa apontar pra pasta-âncora direto)
+#   3. Tem nome no ClickUp diferente da pasta local (clickup_alias)
+#
+# CAMPOS DISPONÍVEIS:
+#   drive_nome:         Nome real da pasta no Drive (quando diferente do nome local)
+#   drive_pasta_ano_id: ID da pasta-âncora no Drive (pula navegação automática).
+#                       Quando preenchido, upload vai pra [pasta-âncora] / [MM. mês] / [DD-MM-YYYY]
+#   clickup_alias:      Alias usado na busca de subtarefa no ClickUp
+#                       (quando o nome no ClickUp difere da pasta local)
+#
+# Importados do prep-agenda-stark/squads/prep-agenda/config/figma-files.yaml @ d1d4de5.
+# Manter sincronizado com aquele arquivo conforme novos clientes ganham estrutura não-padrão.
+
+clientes:
+
+  "Dr. Anderson Kuboniwa":
+    drive_nome: "Dr. Anderson"
+    drive_pasta_ano_id: "1938YPt9KZtCIWMd16K4Q2NNtQeEuCFHl"
+    # CRIATIVOS INSTAGRAM | DR. ANDERSON — estrutura: [pasta] / [MM. MÊS YYYY] / [data] [Tipo]
+
+  "Dr. Gilberto Filho":
+    drive_pasta_ano_id: "1PU7nohuXw-buXweXiKzDvPV-omlx_fDg"
+    # Artes 2026 | Dr. Gilberto Filho — estrutura: Artes 2026 / [MM. MÊS] / [data] [Tipo]
+
+  "Dr. Luciano Esteves":
+    drive_pasta_ano_id: "1Jo-Us_7hgKetMB4JYRV2NA90F-oAuSMh"
+    # 03. Cronograma de Conteúdo | Dr Luciano Esteves — estrutura: [pasta] / [MM. MÊS] / [data] [Tipo]
+
+  "Dra. Ana Paula Polato":
+    drive_pasta_ano_id: "17YJgcAYC0GM47ur9HUMKVWhCHZMJVf2w"
+    # Criativos Instagram — estrutura: [pasta] / [MM. MÊS] / [data] [Tipo]
+
+  "Dra. Anne Groth":
+    drive_pasta_ano_id: "1MWjxwRcrRsewp2lHajOXwg-YnLPt5LFp"
+    # pasta de artes da Dra. Anne Groth
+
+  "Dr. Cadu Gazzinelli":
+    drive_pasta_ano_id: "1URChbjVFimvt5lQzrvxPezKqFo0ItTEo"
+    # pasta de artes do Dr. Cadu Gazzinelli
+
+  "Dr. Marcelo Azevedo":
+    drive_pasta_ano_id: "15Wgzhp7jntlG7vqbiZVR0fMIfgnc036L"
+    # pasta de artes do Dr. Marcelo Azevedo
+
+  "Dr. Felipe Máximo":
+    drive_pasta_ano_id: "1g-y4GZXlxr4J3eSuET-bfiQKY0I7BaP1"
+    # pasta de artes do Dr. Felipe Máximo
+
+  "Empoderatti":
+    drive_pasta_ano_id: "1X_fxEdinSg3BmF0t4r_eExFT07xIFDZ5"
+    # pasta 2026 — está dentro da pasta de uma doutora, não em Clientes/Empoderatti
+
+# Clientes sem entrada aqui usam o modo padrão automaticamente:
+#   - Dra. Graciela Machado
+#   - Dra. Amandia Marchetti
+#   - Dr. Matheus Ocampo
+#   - Dra. Nicolle Andrade
+#   - Dra. Taíssa Recalde
+#   - Dr. Ricardo Martins
+#   - Dr. Rodolfo Soares
+#   - Dr. Daniel Valente
+#   - Dra. Leslye Sartori
+#   - Destra Desenvolvimento Mineral
