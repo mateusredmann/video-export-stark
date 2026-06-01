@@ -60,25 +60,58 @@ Exemplos de pastas-âncora reais (Stark):
 
 Tudo lowercase, `março` mantém cedilha.
 
+## Transporte: rclone (obrigatório)
+
+> 🚨 O Google Drive MCP rejeita uploads > 10MB. Vídeos editados quase sempre passam disso. A partir da v1.2 o transporte canônico é `rclone copyto`. Drive MCP fica só pra resolver `webViewLink` e IDs pós-upload (leitura).
+
+Pré-requisito validado por Eve no início do pipeline:
+- `rclone` no PATH (`Get-Command rclone`)
+- `config.rcloneRemote` presente em `rclone listremotes`
+- `rclone config show <remote>` retorna `type = drive`
+
+Falha em qualquer um → abortar com mensagem pedindo `/video-export --setup-rclone`.
+
 ## Idempotência
 
 Antes de cada upload:
-1. Lista a pasta-destino no Drive.
-2. Pra cada arquivo local, procura por mesmo nome.
-3. Se encontrado e tamanho idêntico → pula com status `skipped`.
-4. Se encontrado e tamanho diferente → sem `--force`, pula e registra warning. Com `--force`, sobrescreve.
+1. `rclone lsjson "<remote>:<path_destino>" --files-only` lista arquivos.
+2. Pra cada arquivo local, procura mesmo `Name` + mesmo `Size`.
+3. Match exato → status `skipped`.
+4. Existe + tamanho diferente:
+   - Sem `--force` → pula + warning.
+   - Com `--force` → `rclone copyto` por cima.
+5. Pasta-destino ainda não existe → tratar como vazia.
+
+## Upload
+
+```powershell
+rclone mkdir "<remote>:<path_destino>"
+rclone copyto "<video_local>" "<remote>:<path_destino>/<video_basename>" `
+  --progress --transfers 1 --drive-chunk-size 64M --retries 2
+rclone copyto "<capa_local>" "<remote>:<path_destino>/<capa_basename>" --retries 2
+```
 
 ## Validação pós-upload
 
-Lista a pasta-destino novamente. Confirma que vídeo e capa estão presentes com nome esperado. Se não → status `partial` ou `failed`.
+`rclone lsjson "<remote>:<path_destino>"` confirma vídeo+capa com nome e tamanho corretos. Se algum falhou → `partial` ou `failed`.
+
+## Resolução de URL pra comentário (Drive MCP — leitura)
+
+`rclone` não retorna URL navegável. Após `copyto`:
+1. `google_drive_list_files` na `<path_destino>` → captura `folder.webViewLink` + IDs.
+2. Cache `folder.id` por `(cliente, data)` na sessão.
+3. Fallback se MCP offline: `rclone link "<remote>:<path_destino>"`.
 
 ## Tratamento de erros comuns
 
 | Erro                                                  | Ação                                                      |
 |-------------------------------------------------------|-----------------------------------------------------------|
+| `rclone` ausente do PATH                              | Aborta squad — pedir `/video-export --setup-rclone`       |
+| Remote `<rcloneRemote>` não existe em `listremotes`   | Aborta squad — pedir `/video-export --setup-rclone`       |
+| `rclone copyto` exit ≠ 0 (não-transitório)            | Falha do par, registra stderr no log                      |
+| `rclone copyto` exit 5 (rate-limit / transitório)     | 1 retry com backoff 5s, depois falha do par               |
 | Pasta `Clientes/<drive_nome>/` não existe (modo padrão) | Falha imediata — pendência, mensagem clara              |
 | `drive_pasta_ano_id` inválido (modo override)         | Falha imediata — pedir atualização do clientes.yaml       |
 | Quota do Drive estourada                              | Falha do par, registra pra retry manual                   |
-| Timeout no upload                                     | 1 retry automático com backoff de 5s, depois falha        |
-| MCP do Drive offline                                  | Aborta o squad inteiro com mensagem explícita             |
+| MCP do Drive offline                                  | Não aborta — usa `rclone link` pra obter URL              |
 | `drive_nome` definido no YAML mas pasta não encontrada | Falha — NÃO faz fallback pro nome do ClickUp             |

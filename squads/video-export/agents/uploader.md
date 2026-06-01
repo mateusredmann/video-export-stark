@@ -69,24 +69,58 @@ Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso
 
 Tudo lowercase, `março` mantém cedilha.
 
-### 3. Idempotência
+### 3. Idempotência (via rclone)
 
 Antes de cada upload:
-1. Lista a pasta-destino no Drive.
-2. Pra cada arquivo local, procura por mesmo nome.
-3. Se encontrado e tamanho idêntico → pula (`skipped`).
-4. Se encontrado e tamanho diferente:
+1. `rclone lsjson "<remote>:<path_destino>" --files-only` lista arquivos remotos.
+2. Pra cada arquivo local, procura mesmo nome + mesmo `Size` (bytes).
+3. Match exato → pula (`skipped`).
+4. Existe + tamanho diferente:
    - Sem `--force` → pula com warning.
-   - Com `--force` → sobrescreve.
+   - Com `--force` → `rclone copyto` sobrescreve.
+5. Pasta-destino não existe ainda → `rclone mkdir`, todos os arquivos são "novos".
 
-### 4. Upload
+### 4. Upload (rclone copyto, OBRIGATÓRIO)
 
-- Upload vídeo + capa **na mesma pasta-destino**, em paralelo.
-- Vídeo > 65MB: upload direto via Drive MCP (sem fallback de Chrome — Drive MCP suporta).
+> 🚨 **Por que rclone:** o Google Drive MCP rejeita uploads > 10MB. Vídeo editado quase sempre passa disso. `rclone copyto` resolve sem limite.
 
-### 5. Validação pós-upload
+Sequência por par (vídeo + capa na mesma pasta-destino, paralelo):
 
-Lista a pasta-destino novamente. Confirma vídeo e capa presentes com nome esperado. Se algum falhou → `partial` ou `failed`.
+```powershell
+rclone mkdir "<remote>:<path_destino>"
+
+rclone copyto `
+  "<video_local>" `
+  "<remote>:<path_destino>/<video_basename>" `
+  --progress --transfers 1 --drive-chunk-size 64M --retries 2
+
+rclone copyto `
+  "<capa_local>" `
+  "<remote>:<path_destino>/<capa_basename>" `
+  --retries 2
+```
+
+- `<remote>` lido de `config.rcloneRemote` (default `gdrive`)
+- Modo padrão: `<path_destino>` = `Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso>/<DD-MM-YYYY>`
+- Modo override (`drive_pasta_ano_id`): resolver caminho humano da pasta-âncora via Drive MCP `get_file_metadata`; construir `<path_destino>` = `<caminho_humano_ancora>/<MM. mes-extenso>/<DD-MM-YYYY>`
+
+**Exit codes:**
+- `0` → ok
+- `5` (rate-limit transitório) → 1 retry com backoff 5s, depois falha
+- demais → falha clara, registra stderr no log
+
+### 5. Resolver `webViewLink` da pasta + IDs (Drive MCP)
+
+`rclone copyto` só retorna exit code. Pra montar o comentário do ClickUp:
+1. `google_drive_list_files` na `<path_destino>` (ou navegar pela hierarquia se a API exigir IDs intermediários).
+2. Capturar `folder.webViewLink`, `folder.id`, e por arquivo `id`/`webViewLink`.
+3. Cache do `folder.id` por `(cliente, data)` por sessão.
+
+Se Drive MCP indisponível: fallback `rclone link "<remote>:<path_destino>"` (avaliar política de compartilhamento da Stark antes).
+
+### 6. Validação pós-upload
+
+`rclone lsjson "<remote>:<path_destino>"` de novo. Confirma vídeo+capa presentes com nome esperado **e tamanho igual ao local**. Se algum falhou → `partial` ou `failed`.
 
 ## Output
 
@@ -99,20 +133,23 @@ uploaded:
   - { name: "reels-01.png", url: "...", id: "..." }
 falhas: []   # quando partial/failed
 modo: "padrão" | "override-startfolder"
+transport: "rclone"   # canônico a partir de v1.2
 ```
 
 ## Regras
 
+- **rclone obrigatório.** Se a CLI não está no PATH ou o remote configurado não está em `rclone listremotes`, aborta o par com mensagem pedindo `/video-export --setup-rclone`. Não tenta cair pro Drive MCP — sabidamente quebra em > 10MB.
 - **Pasta `Clientes/<drive_nome>/`** assumida como existente no modo padrão. Se não existe, **falha clara** — não cria no raiz.
 - **Pasta `<startFolderId>`** assumida como existente no modo override. Se ID for inválido, falha clara.
-- **Subpastas** (`Cronograma de Conteudo`, `Artes`, ano, mês, data, ou `MM. mês`/data no modo override) são criadas sob demanda.
+- **Subpastas** (`Cronograma de Conteudo`, `Artes`, ano, mês, data, ou `MM. mês`/data no modo override) são criadas sob demanda via `rclone mkdir`.
 - **Mismatch silencioso?** Não. Se `drive_nome` está definido no YAML mas a pasta correspondente não existe no Drive, falha — não tenta cair pra `cliente`.
 - **Falhas individuais** vão pra `falhas` e o status fica `partial` se um dos dois subiu.
-- **Compactação:** após cada `list folder`, manter apenas `id`, `name`, `size`. Após cada `upload`, manter apenas `id`, `webViewLink`.
+- **Compactação:** após cada `rclone lsjson`/`list_files`, manter apenas `Name`/`Size`/`id`/`webViewLink`. Após cada `copyto`, manter apenas exit code + nome.
 
 ## Ferramentas
 
-- `mcp__...__google_drive_list_files`
-- `mcp__...__google_drive_create_folder`
-- `mcp__...__google_drive_upload_file`
-- `PowerShell Get-Item` (ler tamanho do arquivo local)
+- `rclone copyto` / `rclone mkdir` / `rclone lsjson` / `rclone listremotes` / `rclone config show` / `rclone link` (transporte e idempotência)
+- `mcp__...__google_drive_list_files` (resolução de `folder.webViewLink` + IDs pós-upload — só leitura, sem cap de tamanho)
+- `mcp__...__google_drive_get_file_metadata` (resolver caminho humano da pasta-âncora `drive_pasta_ano_id`)
+- `PowerShell Get-Item` (ler tamanho do arquivo local quando comparar com lsjson)
+- `PowerShell Get-Command rclone` (sanity-check do binário)

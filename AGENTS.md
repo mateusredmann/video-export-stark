@@ -2,11 +2,11 @@
 
 Pipeline de 5 agentes que entrega vídeos editados ao cliente via Drive + ClickUp.
 
-## Cadeia de execução
+## Cadeia de execução — modo varredura (`/video-export`)
 
 ```
 [Eve export-chief]
-   │  valida flags, carrega/cria config do editor
+   │  valida flags, carrega/cria config do editor, pré-flight do rclone
    │
 [Scan scanner]
    │  varre pasta-raiz, descobre pares (video, capa, cliente, data)
@@ -15,10 +15,24 @@ Pipeline de 5 agentes que entrega vídeos editados ao cliente via Drive + ClickU
    │  busca subtarefa ClickUp por cliente+data
    │
 [Up uploader] ──── em paralelo (3-4 simultâneos por par)
-   │  cria pasta no Drive, sobe vídeo + capa
+   │  rclone copyto vídeo + capa → Drive (sem cap de 10MB)
    │
 [Noti notifier]
       comenta link no ClickUp, @responsável, status = edição concluída
+```
+
+## Cadeia de execução — modo alvo único (`/video-export-task <id>`)
+
+```
+[Eve]   carrega config + pré-flight rclone + parseia task_id
+   │
+[Match em modo REVERSO]  clickup_get_task(id) → deriva cliente + data + parent_assignees
+   │
+[Scan dirigido]  procura pasta-data esperada (+ fallbacks) → 1 par filtrado
+   │
+[Up rclone]  upload do par único
+   │
+[Noti]  comenta na subtask + @ + status (sequencial FR31)
 ```
 
 Falha em um par não aborta os demais — agrega no relatório final.
@@ -29,7 +43,9 @@ Falha em um par não aborta os demais — agrega no relatório final.
 - **Data** prefere o nome da subpasta no formato `DD-MM-YYYY`. Fallback: `mtime` do arquivo de vídeo.
 - **Par vídeo+capa** = mesmo nome-raiz (`reels-01.mp4` + `reels-01.png`). Arquivos órfãos (vídeo sem capa ou capa sem vídeo) entram nas pendências.
 - **Status final fixo:** `edição concluída`. Não é configurável via onboarding.
-- **Cache do editor:** `%USERPROFILE%\.stark-video-export\config.json`. Para reconfigurar, usar `--reconfigure`.
+- **Cache do editor:** `%USERPROFILE%\.stark-video-export\config.json` (schema v2 inclui `rcloneRemote`). Para reconfigurar tudo, `--reconfigure`; só rclone, `--setup-rclone`. Configs v1 ganham migração silenciosa pra v2 na próxima execução.
+- **rclone obrigatório a partir da v1.2.** O MCP do Google Drive rejeita uploads > 10MB e vídeos editados quase sempre passam disso. Up usa `rclone copyto` — Drive MCP só é usado pós-upload pra resolver `webViewLink`/IDs.
+- **Modo reverso do Match** (`/video-export-task <id>`): a partir do `task_id` da subtarefa, Match deriva cliente (folder/list → parent name → regex no subtask.name) e data (regex no nome → `due_date`). Falha → erro fatal com candidatos, nunca infere.
 - **Overrides por cliente:** `squads/video-export/config/clientes.yaml` mapeia clientes que têm `drive_nome` ou `drive_pasta_ano_id` diferente do padrão. Importado do prep-agenda-stark — manter sincronizado.
 - **Idempotência:** se a pasta no Drive já tem o arquivo, pula. Com `--force`, sobrescreve.
 

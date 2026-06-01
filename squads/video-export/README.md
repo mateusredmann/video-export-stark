@@ -1,19 +1,33 @@
 # Squad Video Export
 
-Squad de delivery de vídeos editados. Lê pasta-raiz local → sobe pro Drive → comenta no ClickUp.
+Squad de delivery de vídeos editados. Lê pasta-raiz local → sobe pro Drive (via **rclone**) → comenta no ClickUp.
 
-## Pipeline
+## Pipeline (modo varredura — `/video-export`)
 
 ```
-[Eve export-chief]  carrega config, valida flags, define escopo
+[Eve export-chief]  carrega config, valida flags, define escopo, pré-flight do rclone
    │
 [Scan scanner]   varre pasta-raiz → lista pares (vídeo, capa, cliente, data)
    │
    ├──► [Match matcher]   busca subtarefa ClickUp por cliente+data    ─┐ (paralelo, lotes de 4)
    │
-   ├──► [Up uploader]     upload Drive: Clientes/[cli]/.../[data]/    ─┤
+   ├──► [Up uploader]     rclone copyto vídeo+capa → Drive            ─┤
    │
    └──► [Noti notifier]   comenta link + @resp + status "edição concluída"
+```
+
+## Pipeline (modo alvo único — `/video-export-task <id>`)
+
+```
+[Eve]  carrega config + pré-flight rclone
+   │
+[Match em modo REVERSO]  clickup_get_task(id) → deriva cliente + data + parent_assignees
+   │
+[Scan dirigido]  procura pasta-data esperada (+ fallbacks) → 1 par filtrado
+   │
+[Up rclone]  upload do par único
+   │
+[Noti]  comenta na subtask + status
 ```
 
 ## Agentes
@@ -29,7 +43,7 @@ Squad de delivery de vídeos editados. Lê pasta-raiz local → sobe pro Drive �
 ## Configuração
 
 ### Config do editor (cache local, gerado no onboarding)
-Cache em `%USERPROFILE%\.stark-video-export\config.json`:
+Cache em `%USERPROFILE%\.stark-video-export\config.json` (v2 a partir de 2026-06):
 
 ```json
 {
@@ -38,11 +52,17 @@ Cache em `%USERPROFILE%\.stark-video-export\config.json`:
   "videoExt": ".mp4",
   "capaExt": ".png",
   "mentionResponsavel": true,
-  "version": 1
+  "rcloneRemote": "gdrive",
+  "version": 2
 }
 ```
 
-Para reconfigurar: `/video-export --reconfigure`.
+- Para reconfigurar tudo: `/video-export --reconfigure`
+- Para reconfigurar só o rclone (re-login, trocar remote): `/video-export --setup-rclone`
+
+### rclone (obrigatório a partir da v1.2)
+
+Por que: o MCP do Google Drive rejeita uploads > 10MB. Vídeos editados quase sempre passam disso. O onboarding (etapa 6) detecta a CLI, instala se faltar (winget/brew/install.sh) e roda `rclone config` pra criar o remote `gdrive:`.
 
 ### Overrides por cliente (versionado no repo)
 `config/clientes.yaml` lista clientes com estrutura Drive não-padrão:

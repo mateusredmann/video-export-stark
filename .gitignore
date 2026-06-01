@@ -7,3 +7,8 @@ __pycache__/
 Thumbs.db
 node_modules/
 .cache/
+
+# Config local do editor (gerado pelo onboarding em %USERPROFILE%\.stark-video-export\,
+# mas pode aparecer na raiz se rodado fora do diretorio canonico)
+/config.json
+/logs/

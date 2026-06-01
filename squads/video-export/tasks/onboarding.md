@@ -45,6 +45,124 @@ Quando comentar no ClickUp, devo @-mencionar o responsável da tarefa-mãe? [sim
 >
 ```
 
+### 6. rclone — checagem e instalação guiada
+
+> ⚠️ **Obrigatório.** O Google Drive MCP rejeita arquivos > 10MB. Vídeo editado quase sempre passa de 10MB, então o upload do vídeo é feito via `rclone copyto` contra um remote configurado pelo editor. Sem rclone, a skill não consegue entregar.
+
+#### 6.1 Detectar instalação
+
+```powershell
+$rclonePath = (Get-Command rclone -ErrorAction SilentlyContinue).Source
+```
+
+- **`$rclonePath` retornou caminho** → ler versão (`rclone version | Select-Object -First 1`) e mostrar:
+  ```
+  ✅ rclone detectado: <versão> em <caminho>
+  ```
+  Pular pra 6.3.
+
+- **Não encontrado** → seguir 6.2.
+
+#### 6.2 Instalação guiada
+
+Mostrar instrução **por sistema operacional** (detectar via `$IsWindows` / `$env:OS` / fallback Bash `uname`):
+
+**Windows (default neste repo):**
+```
+rclone não está instalado. Vou guiar você:
+
+Opção A (winget — recomendado):
+  winget install Rclone.Rclone
+
+Opção B (Chocolatey):
+  choco install rclone
+
+Opção C (manual):
+  1. Baixe https://rclone.org/downloads/ (escolha Windows AMD64 zip)
+  2. Extraia rclone.exe pra C:\Program Files\rclone\
+  3. Adicione ao PATH: System Properties → Environment Variables → Path → C:\Program Files\rclone
+
+Depois rode: rclone version
+Quando terminar, digite "ok" pra continuar.
+```
+
+**macOS:**
+```
+brew install rclone
+```
+
+**Linux:**
+```
+curl https://rclone.org/install.sh | sudo bash
+```
+
+Após o editor confirmar com "ok" / Enter, **re-executar a detecção da 6.1**. Loop até detectar (máx 3 tentativas; depois aborta com mensagem clara).
+
+#### 6.3 Configurar o remote `gdrive:`
+
+Listar remotes existentes:
+
+```powershell
+rclone listremotes
+```
+
+- **Saída contém `gdrive:` (ou outro remote do tipo `drive`)** → perguntar qual usar:
+  ```
+  rclone já tem remotes configurados:
+    - gdrive:
+    - work:
+
+  Qual usar pro Drive da Stark? [gdrive]
+  >
+  ```
+  Validar que o tipo é `drive` (via `rclone config show <nome> | Select-String "type ="`).
+
+- **Nenhum remote `drive`** → guiar criação interativa:
+  ```
+  Vou abrir o wizard do rclone agora. Siga essas respostas:
+
+    n         # New remote
+    gdrive    # Name
+    drive     # Storage (digite "drive" ou escolha o número de "Google Drive")
+    <Enter>   # client_id (deixa em branco)
+    <Enter>   # client_secret (deixa em branco)
+    1         # scope = Full access
+    <Enter>   # service_account_file (em branco)
+    n         # Edit advanced config? = No
+    y         # Use auto config? = Yes (vai abrir o browser pra login Google)
+    n         # Configure as Shared Drive? = No (a menos que você use Shared Drive)
+    y         # Confirma
+    q         # Quit
+
+  Pronto pra abrir o wizard? [s/N]
+  ```
+
+  Quando o editor confirmar, executar:
+  ```powershell
+  rclone config
+  ```
+
+  > ℹ️ O comando é interativo — Eve mostra a sequência acima e deixa o editor pilotar. Após o wizard fechar, validar com `rclone listremotes` que `gdrive:` apareceu.
+
+#### 6.4 Validar acesso ao Drive da Stark
+
+Confirmar que o remote enxerga a pasta `Clientes/`:
+
+```powershell
+rclone lsd gdrive:Clientes --max-depth 1
+```
+
+- **Retornou lista de clientes** → OK, salvar o nome do remote.
+- **Erro de permissão / "directory not found"** → mostrar:
+  ```
+  ⚠️ O remote 'gdrive:' está configurado mas não enxerga a pasta 'Clientes/'.
+     Verifica:
+       1. O Google logado no rclone é o da Stark (não o pessoal).
+       2. A pasta 'Clientes' está no raiz "My Drive" desse usuário.
+     Rode 'rclone config reconnect gdrive:' pra refazer o login se for o caso.
+  ```
+  Pedir confirmação manual antes de continuar (o editor pode estar usando override de `drive_pasta_ano_id` pra todos os clientes, caso em que a pasta `Clientes/` não precisa existir).
+
 ## Persistência
 
 Escreve `%USERPROFILE%\.stark-video-export\config.json` com formato:
@@ -56,10 +174,14 @@ Escreve `%USERPROFILE%\.stark-video-export\config.json` com formato:
   "videoExt": ".mp4",
   "capaExt": ".png",
   "mentionResponsavel": true,
-  "version": 1,
+  "rcloneRemote": "gdrive",
+  "rcloneCheckedAt": "<ISO timestamp>",
+  "version": 2,
   "createdAt": "<ISO timestamp>"
 }
 ```
+
+> 🆕 Campo `rcloneRemote` adicionado na v2. Configs v1 (sem esse campo) disparam um mini-onboarding só da etapa 6 ao serem carregadas, sem perguntar de novo email/pasta/extensões.
 
 Cria também os diretórios:
 - `%USERPROFILE%\.stark-video-export\` (raiz)
@@ -69,9 +191,22 @@ Cria também os diretórios:
 
 ```
 ✅ Setup concluído. Sua config está em %USERPROFILE%\.stark-video-export\config.json
+   rclone remote: gdrive: → Drive da Stark ✓
    Use /video-export --reconfigure pra mudar.
 
 Próxima execução vai direto pro modo --hoje. Bora?
 ```
 
 E continua o pipeline com `--hoje` por default (a menos que o editor já tenha passado outra flag junto com o `/video-export`).
+
+## Migração v1 → v2 (config sem `rcloneRemote`)
+
+Quando Eve carrega a config e detecta `version: 1` (ou ausência do campo `rcloneRemote`):
+
+1. Mostra:
+   ```
+   Sua config é da v1 (pré-rclone). Vou completar o setup só do rclone — leva 2 min.
+   ```
+2. Executa as etapas 6.1 → 6.4 sem repetir 1-5.
+3. Salva o config preservando todos os campos antigos + `rcloneRemote` + `version: 2`.
+4. Continua o pipeline original.

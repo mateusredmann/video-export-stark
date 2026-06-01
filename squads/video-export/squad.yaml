@@ -1,11 +1,12 @@
 name: video-export
-version: 1.1.0
+version: 1.2.0
 short-title: Video Export
 description: >
   Automatiza a entrega de vídeos editados: varre pasta-raiz do editor,
   descobre pares vídeo+capa, identifica cliente pela pasta-pai, sobe
-  pro Google Drive na hierarquia padrão e comenta o link na subtarefa
-  do ClickUp marcando como "edição concluída".
+  pro Google Drive (via rclone, sem cap de 10MB) e comenta o link na
+  subtarefa do ClickUp marcando como "edição concluída". Suporta
+  também modo "alvo único" via /video-export-task <task_id>.
 author: stark.marketing
 license: UNLICENSED
 slashPrefix: video-export
@@ -30,6 +31,7 @@ components:
     - export-pasta.md
     - export-hoje.md
     - export-semana.md
+    - export-task.md
   config:
     - status-map.yaml
     - clientes.yaml
@@ -45,12 +47,22 @@ mcps:
     - google-drive
   optional: []
 
+externalTools:
+  required:
+    - name: rclone
+      reason: "Upload de vídeo > 10MB (Drive MCP rejeita arquivos maiores). Configurado no onboarding (etapa 6)."
+      installHint:
+        windows: "winget install Rclone.Rclone"
+        macos: "brew install rclone"
+        linux: "curl https://rclone.org/install.sh | sudo bash"
+
 defaults:
   videoExt: ".mp4"
   capaExt: ".png"
   statusFinal: "edição concluída"
   parallelism: 4
   mentionResponsavel: true
+  rcloneRemote: "gdrive"
 
 tags:
   - video
