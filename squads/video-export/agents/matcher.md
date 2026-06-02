@@ -125,3 +125,53 @@ data_source: "subtask_name_regex"         # debug: como achou
 - **Nunca infere cliente/data sem evidência** — falha com mensagem clara e candidatos.
 - **Subtarefa já marcada `edição concluída`** → registra warning no relatório, mas continua (a menos que sem `--force`, caso em que pede confirmação ao editor).
 - **task_id que é tarefa-mãe e não subtarefa** → erro: "esse é o ID da mãe. Subtarefas: …" + lista.
+
+---
+
+## Modo path (alvo único, via `/video-export-task <caminho>`)
+
+Quando o trigger é `/video-export-task <caminho_de_pasta>`, Match opera no modo **forward** normal (igual ao `/video-export`), mas a fonte de cliente+data é o **path local específico** em vez de uma varredura ampla do `videoRoot`. O Scan local já entregou o par; Match só precisa derivar (cliente, data) do nome e fazer o lookup no ClickUp.
+
+### Input (modo path)
+
+```yaml
+mode: "path"
+pasta: "D:\\Stark MKT\\02 - Videos\\2026\\2026 - Junho\\16-06 Janete"
+par:
+  video: "...\\16-06 Janete.mp4"
+  capa:  "...\\16-06 Janete.png"
+```
+
+### Algoritmo (modo path)
+
+1. **Extrair cliente+data** — pela ordem: nome do `video` → nome da `pasta` → componentes do path ascendente (ano e mês como fallback). Regex de data: `DD-MM-YYYY`, `DD-MM-AA`, `DD-MM`. Cliente = resto do nome após remover token de data e extensão. Detalhes em [workflows/export-task.md](../workflows/export-task.md#extração-clientedata-do-path-modo-path).
+2. **Normalizar cliente** — etapa OBRIGATÓRIA (igual ao forward normal): remove `Dr.`/`Dra.`, lowercase, sem acentos, collapse whitespace.
+3. **Aplicar `clickup_alias`** do `config/clientes.yaml` se existir.
+4. **`clickup_search "<cliente_norm> <DD-MM>"`** + ranking padrão do forward.
+5. **0 matches** → erro fatal "cliente '<x>' não encontrado nas subtarefas com data <DD-MM>"; sugere top-5 mais próximos por levenshtein.
+6. **>1 match empatado** → prompt interativo, lista `subtask_id + parent.name`.
+7. **`clickup_get_task(parent.id).assignees`** → `parent_assignees` pra @-mention.
+
+### Output (modo path)
+
+```yaml
+match: "ok"
+mode: "path"
+subtask_id: "8h3a2b1"
+subtask_name: "Edição de vídeo — 16/06 Reels Janete"
+list_id: "901234567"
+parent_task_id: "8h3a2b0"
+parent_assignees: [12345]
+cliente_derivado: "Janete"                # cru, antes de normalize
+cliente_resolvido: "Dra. Janete Almeida"  # depois do match com parent.name
+data_derivada: "16-06-2026"
+cliente_source: "video_filename"          # debug: "video_filename" | "folder_name" | "path_ancestor"
+data_source: "video_filename"
+```
+
+### Regras (modo path)
+
+- **Não usa lookup reverso** — opera no fluxo forward (cliente+data → subtask).
+- **Ano ausente** → herda do componente do path (`2026`); se nem isso, ano corrente, com WARN.
+- **Falha na extração** → erro fatal, sugere rename `DD-MM Cliente.ext` OU fallback pra `--task-id`.
+- **Cliente raw ≠ cliente_resolvido** é esperado (no exemplo: filename diz "Janete", ClickUp tem "Dra. Janete Almeida") — registra os dois pro log.
