@@ -10,7 +10,7 @@ Toda vez que o editor termina um lote de vídeos, ele roda `/video-export` (ou `
 2. Identifica pares vídeo+capa pelo mesmo nome-raiz
 3. Extrai cliente do nome da pasta-pai e data da subpasta (ou `due_date` da subtarefa)
 4. Localiza a subtarefa no ClickUp por cliente + data
-5. Sobe vídeo + capa pro Google Drive na hierarquia padrão — via **rclone**, sem o cap de 10MB do MCP
+5. Sobe vídeo + capa pro **Drive Compartilhado da Stark** na hierarquia padrão — via **rclone** (`--drive-team-drive`), sem o cap de 10MB do MCP. Só entrega pra cliente que já tem pasta oficial lá
 6. Comenta o link da pasta no ClickUp + @ no responsável
 7. Move a subtarefa pra status `edição concluída`
 
@@ -72,10 +72,12 @@ A skill pergunta:
 5. @-mention do responsável da tarefa-mãe? (sim/não)
 6. **rclone** — detecta a CLI, instala (winget/brew/install.sh) e roda `rclone config` pra criar o remote `gdrive:`
 
-Salvo em `%USERPROFILE%\.stark-video-export\config.json` (schema v2). Próximas execuções pulam o briefing.
+Salvo em `%USERPROFILE%\.stark-video-export\config.json` (schema v3). Próximas execuções pulam o briefing.
 
 Pra reconfigurar só o rclone (re-login, trocar remote) sem repetir o resto: `/video-export --setup-rclone`.
-Configs v1 (sem `rcloneRemote`) ganham migração silenciosa pra v2 na próxima execução.
+Configs v1 (sem `rcloneRemote`) e v2 (sem `rcloneTeamDriveId`) ganham migração silenciosa na próxima execução.
+
+> 🚨 **Upload mira o Drive Compartilhado da Stark** (`rcloneTeamDriveId=0ABl2cpta6dNRUk9PVA`), não o "Meu Drive" pessoal — todo comando rclone passa `--drive-team-drive`. A skill só entrega pra cliente que já tem pasta oficial nesse shared drive.
 
 ## Convenções
 
@@ -98,7 +100,7 @@ D:\Edicoes\
 ## Resultado
 
 ```
-Drive: Clientes/[cliente]/Cronograma de Conteudo/Artes/[ano]/[mes]/[data]/
+Drive: [Drive Compartilhado Stark]/Clientes/[cliente]/Cronograma de Conteudo/Artes/[ano]/[mes]/[data]/
 ClickUp: subtarefa com comentário + link Drive + status = edição concluída
 ```
 
@@ -115,6 +117,7 @@ Importado do upstream `prep-agenda-stark` — manter sincronizado quando cliente
 ## Pré-requisitos
 
 - **rclone** ≥ 1.65 com remote `gdrive:` configurado (o onboarding cuida disso na etapa 6)
+- Conta Google logada no rclone com **acesso ao Drive Compartilhado da Stark** (`0ABl2cpta6dNRUk9PVA`) — é onde ficam as pastas oficiais dos clientes
 - **ClickUp MCP** conectado
 - **Google Drive MCP** conectado (apenas leitura — resolver `webViewLink` pós-upload)
 - Acesso de leitura na pasta-raiz dos vídeos
@@ -122,7 +125,8 @@ Importado do upstream `prep-agenda-stark` — manter sincronizado quando cliente
 ## Regras críticas (NÃO violar)
 
 - **FR31 — Sequencial obrigatório no Noti.** `clickup_create_task_comment` + `clickup_update_task` nunca em paralelo na mesma subtarefa. O ClickUp dropa o comentário silenciosamente quando os dois competem.
-- **Pasta-âncora preexistente (FR21).** A skill não cria `Clientes/<cliente>/` nem `<startFolderId>` — falha clara se não existir.
+- **Tudo no Drive Compartilhado, nunca no Meu Drive.** Todo comando rclone roda com `--drive-team-drive <rcloneTeamDriveId>`. Sem o flag o upload cai no "Meu Drive" pessoal do editor (bug corrigido na v1.3).
+- **Pasta-âncora preexistente (FR21).** A skill não cria `Clientes/<cliente>/` nem `<startFolderId>` — cliente sem pasta oficial no shared drive vira pendência, nunca cria a raiz.
 - **Match é read-only.** Sem subtarefa encontrada → pendência, nunca cria.
 - **Mismatch silencioso proibido (FR25a).** Se `drive_nome` está no YAML mas a pasta não existe no Drive, falha — não cai pro `cliente` original.
 

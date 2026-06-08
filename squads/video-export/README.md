@@ -53,7 +53,8 @@ Cache em `%USERPROFILE%\.stark-video-export\config.json` (v2 a partir de 2026-06
   "capaExt": ".png",
   "mentionResponsavel": true,
   "rcloneRemote": "gdrive",
-  "version": 2
+  "rcloneTeamDriveId": "0ABl2cpta6dNRUk9PVA",
+  "version": 3
 }
 ```
 

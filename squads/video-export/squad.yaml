@@ -1,5 +1,5 @@
 name: video-export
-version: 1.2.0
+version: 1.3.0
 short-title: Video Export
 description: >
   Automatiza a entrega de vídeos editados: varre pasta-raiz do editor,
@@ -63,6 +63,10 @@ defaults:
   parallelism: 4
   mentionResponsavel: true
   rcloneRemote: "gdrive"
+  # Drive Compartilhado da Stark (pastas oficiais de cada cliente). TODO comando rclone
+  # roda com `--drive-team-drive <rcloneTeamDriveId>` pra mirar este shared drive em vez
+  # do "Meu Drive" pessoal de quem está rodando. NÃO criar pastas no Meu Drive.
+  rcloneTeamDriveId: "0ABl2cpta6dNRUk9PVA"
 
 tags:
   - video

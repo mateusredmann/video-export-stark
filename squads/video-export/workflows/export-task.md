@@ -219,8 +219,8 @@ Qual é o que vai pra essa subtarefa? [1-3]
 ```
 $ /video-export-task "D:\Stark MKT\02 - Videos\2026\2026 - Junho\16-06 Janete"
 
-→ Eve: config v2 carregada (rcloneRemote=gdrive)
-→ Pré-flight rclone: ✓
+→ Eve: config v3 carregada (rcloneRemote=gdrive, rcloneTeamDriveId=0ABl2cpta6dNRUk9PVA)
+→ Pré-flight rclone: ✓ (shared drive da Stark acessível)
 → Tipo de argumento: path
 → Scan local: D:\Stark MKT\02 - Videos\2026\2026 - Junho\16-06 Janete\
     Pares: 1
@@ -235,7 +235,8 @@ $ /video-export-task "D:\Stark MKT\02 - Videos\2026\2026 - Junho\16-06 Janete"
       8h3a2b1 — "Edição de vídeo — 16/06 Reels Janete"
         parent: 8h3a2b0 — "Dra. Janete Almeida — 16/06 Reels Tema X"
     parent_assignees: ["Mateus Redmann"]
-→ Up (rclone):
+→ Up (rclone, --drive-team-drive 0ABl2cpta6dNRUk9PVA):
+    gate: gdrive:Clientes/Dra. Janete Almeida existe no shared drive ✓
     rclone copyto "16-06 Janete.mp4" → gdrive:Clientes/Dra. Janete Almeida/.../16-06-2026/
     rclone copyto "16-06 Janete.png" → idem
 → Drive MCP: webViewLink resolvido
@@ -250,8 +251,8 @@ $ /video-export-task "D:\Stark MKT\02 - Videos\2026\2026 - Junho\16-06 Janete"
 ```
 $ /video-export-task 8gqkmtp --nome-raiz "reels-02"
 
-→ Eve: config v2 carregada (rcloneRemote=gdrive)
-→ Pré-flight rclone: ✓
+→ Eve: config v3 carregada (rcloneRemote=gdrive, rcloneTeamDriveId=0ABl2cpta6dNRUk9PVA)
+→ Pré-flight rclone: ✓ (shared drive da Stark acessível)
 → Match reverso:
     task_id: 8gqkmtp
     subtask: "Edição de vídeo — 27-05 Reels Pré-treino"
@@ -259,7 +260,7 @@ $ /video-export-task 8gqkmtp --nome-raiz "reels-02"
     data extraída: "27-05-2026"
     parent_assignees: ["Mateus Redmann"]
 → Scan dirigido: D:\Edicoes\Dr. Felipe Máximo\27-05-2026\ → 1 par filtrado por reels-02
-→ Up (rclone): 
+→ Up (rclone, --drive-team-drive 0ABl2cpta6dNRUk9PVA):
     rclone copyto reels-02.mp4 → gdrive:Clientes/Dr. Felipe Máximo/Cronograma de Conteudo/Artes/2026/maio/27-05-2026/
     rclone copyto reels-02.png → idem
     [drive_pasta_ano_id presente: usa modo override → 04. abril/27-05-2026/]

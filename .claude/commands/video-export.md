@@ -47,15 +47,19 @@ Lê `%USERPROFILE%\.stark-video-export\config.json`.
 - Não existe OU `--reconfigure` passado → roda [onboarding completo](../../squads/video-export/tasks/onboarding.md) e continua.
 - `--setup-rclone` passado → executa só a etapa 6 do onboarding (rclone), salva, continua.
 - Config existe com `version: 1` (sem `rcloneRemote`) → migração silenciosa: roda só a etapa 6, sobe pra v2, continua.
-- Config existe v2 → segue direto pro scan.
+- Config existe com `version: 2` (sem `rcloneTeamDriveId`) → migração silenciosa: injeta `rcloneTeamDriveId` (`0ABl2cpta6dNRUk9PVA`, default do `squad.yaml`), revalida acesso, sobe pra v3, continua.
+- Config existe v3 → segue direto pro scan.
 
 ### 1b. Pré-flight do rclone (antes de qualquer upload)
 
 - `Get-Command rclone` → existe?
 - `rclone listremotes` contém `config.rcloneRemote`?
 - `rclone config show <remote>` retorna `type = drive`?
+- `rclone lsd <remote>:Clientes --drive-team-drive <rcloneTeamDriveId>` enxerga o shared drive da Stark?
 
 Falhou qualquer um → aborta com mensagem pedindo `/video-export --setup-rclone`.
+
+> 🚨 **Todo comando rclone (mkdir/copyto/lsjson/lsf/link) roda com `--drive-team-drive <rcloneTeamDriveId>`** (default `0ABl2cpta6dNRUk9PVA` — Drive Compartilhado da Stark). Sem o flag o upload cai no "Meu Drive" pessoal. Só sobe pra cliente com pasta oficial nesse shared drive.
 
 ### 2. Resolver modo
 
@@ -183,7 +187,7 @@ Inverte o fluxo: começa pelo ClickUp e desce pro filesystem. Útil quando você
 
 ### 5.1 Config do editor (cache local)
 
-Caminho: `%USERPROFILE%\.stark-video-export\config.json` (v2 a partir de 2026-06)
+Caminho: `%USERPROFILE%\.stark-video-export\config.json` (v3 a partir de 2026-06)
 
 ```json
 {
@@ -193,13 +197,15 @@ Caminho: `%USERPROFILE%\.stark-video-export\config.json` (v2 a partir de 2026-06
   "capaExt": ".png",
   "mentionResponsavel": true,
   "rcloneRemote": "gdrive",
-  "version": 2
+  "rcloneTeamDriveId": "0ABl2cpta6dNRUk9PVA",
+  "version": 3
 }
 ```
 
 - **Reconfigurar tudo:** `/video-export --reconfigure`
 - **Reconfigurar só o rclone:** `/video-export --setup-rclone`
 - **Migração v1 → v2:** se a config existe sem `rcloneRemote`, Eve dispara automaticamente só a etapa 6 do onboarding na próxima execução (sem repetir email/pasta/extensões).
+- **Migração v2 → v3:** se a config existe sem `rcloneTeamDriveId`, Eve injeta o id do shared drive (`0ABl2cpta6dNRUk9PVA`) sem perguntar nada e salva como v3 — é o que faz o upload mirar o Drive Compartilhado em vez do Meu Drive.
 
 Logs por execução: `%USERPROFILE%\.stark-video-export\logs\<timestamp>.log`.
 
@@ -255,7 +261,7 @@ Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso
 <startFolderId>/<MM. mes-extenso>/<DD-MM-YYYY>/
 ```
 
-A pasta-âncora (`Clientes/<drive_nome>/` ou `<startFolderId>`) é assumida como **preexistente** — falha clara se não existir, não cria no raiz. Subpastas intermediárias (Cronograma, Artes, ano, mês, data) são criadas sob demanda via `rclone mkdir`.
+A pasta-âncora (`Clientes/<drive_nome>/` ou `<startFolderId>`) é assumida como **preexistente dentro do Drive Compartilhado da Stark** — falha clara se não existir (pendência `cliente sem pasta no Drive Compartilhado`), nunca cria a raiz. Subpastas intermediárias (Cronograma, Artes, ano, mês, data) são criadas sob demanda via `rclone mkdir`, sempre com `--drive-team-drive <rcloneTeamDriveId>`.
 
 ## 6. Dependências externas
 

@@ -42,8 +42,8 @@ Variante "alvo único" do `/video-export`. Em vez de varrer `videoRoot` por data
 ## Pipeline — modo `task_id` / URL (reverso)
 
 ```
-1. Eve carrega config.json (dispara onboarding completo se ausente; etapa 6 se v1)
-1b. Pré-flight rclone (Get-Command + listremotes + tipo drive)
+1. Eve carrega config.json (dispara onboarding completo se ausente; etapa 6 se v1; injeta rcloneTeamDriveId se v2)
+1b. Pré-flight rclone (Get-Command + listremotes + tipo drive + acesso ao shared drive via --drive-team-drive)
 2. Eve parseia <task_id> ou URL → task_id limpo
 3. Match (read-only):
      a. clickup_get_task(task_id) → name, status, parent, list_id

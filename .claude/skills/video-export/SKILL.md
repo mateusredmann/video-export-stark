@@ -88,9 +88,11 @@ Se `%USERPROFILE%\.stark-video-export\config.json` não existe (ou `--reconfigur
 3. **Extensão do vídeo** (default `.mp4`)
 4. **Extensão da capa** (default `.png`)
 5. **@-mention do responsável?** (default `sim`)
-6. **rclone (obrigatório)** — checar instalação, guiar install por SO se faltar, configurar o remote `gdrive:` via `rclone config` se não existir, validar com `rclone lsd gdrive:Clientes --max-depth 1`. Detalhes completos em [`squads/video-export/tasks/onboarding.md`](../../squads/video-export/tasks/onboarding.md) (seção 6).
+6. **rclone (obrigatório)** — checar instalação, guiar install por SO se faltar, configurar o remote `gdrive:` via `rclone config` se não existir (responder **N** em "Configure as Shared Drive?" — o shared drive é mirado por flag, não baked), validar com `rclone lsd gdrive:Clientes --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1`. Detalhes completos em [`squads/video-export/tasks/onboarding.md`](../../squads/video-export/tasks/onboarding.md) (seção 6).
 
 > ⚠️ **Por que rclone é obrigatório:** o MCP do Google Drive rejeita uploads > 10MB. Vídeos editados quase sempre passam disso. `rclone copyto` resolve isso transferindo direto pelo remote configurado pelo editor.
+>
+> 🚨 **Drive Compartilhado, não Meu Drive.** Todo comando rclone roda com `--drive-team-drive <rcloneTeamDriveId>` (`0ABl2cpta6dNRUk9PVA` — shared drive da Stark com as pastas oficiais dos clientes). Sem o flag o rclone cria pastas no "Meu Drive" pessoal de quem roda (bug das primeiras versões). A skill só sobe pra cliente que já tem pasta nesse shared drive.
 
 Salvar `config.json`:
 
@@ -102,8 +104,9 @@ Salvar `config.json`:
   "capaExt": ".png",
   "mentionResponsavel": true,
   "rcloneRemote": "gdrive",
+  "rcloneTeamDriveId": "0ABl2cpta6dNRUk9PVA",
   "rcloneCheckedAt": "<ISO timestamp>",
-  "version": 2,
+  "version": 3,
   "createdAt": "<ISO timestamp>"
 }
 ```
@@ -112,7 +115,9 @@ Criar também `%USERPROFILE%\.stark-video-export\logs\`.
 
 **Migração de config v1 → v2:** se Eve carregar uma config sem `rcloneRemote` ou com `version: 1`, executar apenas a etapa 6 do onboarding (mini-setup do rclone), preservar os demais campos, salvar com `version: 2`. Não repete perguntas 1-5.
 
-`--setup-rclone` força só a etapa 6 mesmo quando a config já está em v2 (útil pra reconectar o Google).
+**Migração de config v2 → v3:** se Eve carregar uma config sem `rcloneTeamDriveId` ou com `version: 2`, **sem perguntar nada** injetar `rcloneTeamDriveId` com o default do `squad.yaml` (`0ABl2cpta6dNRUk9PVA`), revalidar acesso com `rclone lsd gdrive:Clientes --drive-team-drive <id>` e salvar como `version: 3`. É o conserto que faz a skill mirar o shared drive em vez do Meu Drive.
+
+`--setup-rclone` força só a etapa 6 mesmo quando a config já está em v3 (útil pra reconectar o Google).
 
 Depois do onboarding, continua o pipeline com `--hoje` (a não ser que outra flag já tenha sido passada).
 
@@ -278,9 +283,26 @@ alternativas: ["8gqkmpa", ...] # quando ambíguo
 
 **Input por par:** `video`, `capa`, `cliente`, `data`, `force`.
 
+> 🚨 **Tudo no Drive Compartilhado da Stark.** Cada comando rclone abaixo roda com
+> `--drive-team-drive <config.rcloneTeamDriveId>` (default `0ABl2cpta6dNRUk9PVA`). Nos exemplos,
+> `<TD>` = `--drive-team-drive 0ABl2cpta6dNRUk9PVA`. Sem o flag, o rclone usa o "Meu Drive"
+> pessoal do editor e cria pastas órfãs lá. **Só sobe pra cliente que já tem pasta nesse shared drive.**
+
 ### 8.1 Lookup obrigatório em `clientes.yaml`
 
 Antes de construir o caminho, consultar overrides do cliente (ver seção 11). Define se vai em **modo padrão** ou **modo override**.
+
+### 8.1.5 Gate — cliente tem pasta oficial no shared drive?
+
+Antes de qualquer `mkdir`/`copyto`:
+
+```powershell
+# modo padrão
+rclone lsf "<remote>:Clientes/<drive_nome OR cliente>" <TD> --dirs-only --max-depth 1
+```
+
+- Pasta-raiz do cliente não existe → **par `failed`**, motivo `cliente sem pasta no Drive Compartilhado`. **Nunca** criar a raiz do cliente.
+- Modo override: a pasta-âncora (`drive_pasta_ano_id`) precisa ser alcançável dentro do shared drive (validado ao resolvê-la na 8.5). Fora do shared drive / ID inválido → `failed`.
 
 ### 8.2 Hierarquia destino
 
@@ -320,7 +342,7 @@ Tudo lowercase. `março` mantém cedilha.
 Antes de cada upload, comparar local vs. remote via `rclone lsjson`:
 
 ```powershell
-rclone lsjson "gdrive:Clientes/<cliente>/.../<DD-MM-YYYY>" --files-only
+rclone lsjson "gdrive:Clientes/<cliente>/.../<DD-MM-YYYY>" <TD> --files-only
 ```
 
 Pra cada arquivo local:
@@ -339,29 +361,30 @@ Pra cada arquivo local:
 Sequência por par (vídeo + capa **na mesma pasta-destino**, em paralelo):
 
 ```powershell
-# Garante pasta destino (no-op se já existe)
-rclone mkdir "<remote>:<path_destino>"
+# Garante pasta destino (no-op se já existe) — sob uma raiz de cliente já validada na 8.1.5
+rclone mkdir "<remote>:<path_destino>" <TD>
 
 # Upload do vídeo
 rclone copyto `
   "D:\Edicoes\<cliente>\<DD-MM-YYYY>\reels-01.mp4" `
-  "<remote>:<path_destino>/reels-01.mp4" `
+  "<remote>:<path_destino>/reels-01.mp4" <TD> `
   --progress --transfers 1 --drive-chunk-size 64M --retries 2
 
 # Upload da capa (mesma chamada padrão; pequena, mas mantém o mesmo caminho de tooling)
 rclone copyto `
   "D:\Edicoes\<cliente>\<DD-MM-YYYY>\reels-01.png" `
-  "<remote>:<path_destino>/reels-01.png" `
+  "<remote>:<path_destino>/reels-01.png" <TD> `
   --retries 2
 ```
 
 - `<remote>` = `config.rcloneRemote` (default `gdrive`)
+- `<TD>` = `--drive-team-drive <config.rcloneTeamDriveId>` (default `0ABl2cpta6dNRUk9PVA`) — **obrigatório em todo comando rclone**
 - `<path_destino>` no **modo padrão** = `Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso>/<DD-MM-YYYY>`
-- No **modo override** (`drive_pasta_ano_id` definido), rclone não navega por ID. Usar:
+- No **modo override** (`drive_pasta_ano_id` definido), rclone não navega por ID. Usar `--drive-root-folder-id` **junto com `<TD>`** (a âncora fica dentro do shared drive):
   ```powershell
-  rclone copyto <arquivo> "<remote>:" --drive-root-folder-id <startFolderId> --drive-root-folder-id-resolve-prefix "<MM. mes-extenso>/<DD-MM-YYYY>/<arquivo>"
+  rclone copyto <arquivo> "<remote>:" <TD> --drive-root-folder-id <startFolderId> --drive-root-folder-id-resolve-prefix "<MM. mes-extenso>/<DD-MM-YYYY>/<arquivo>"
   ```
-  ou, mais simples, pré-resolver o caminho humano dessa pasta-âncora via Drive MCP `get_file_metadata` (nome + parents) e construir o path absoluto pra rclone.
+  ou, mais simples, pré-resolver o caminho humano dessa pasta-âncora via Drive MCP `get_file_metadata` (nome + parents) e construir o path absoluto pra rclone (sempre com `<TD>`).
 
 **Exit codes do rclone:**
 - `0` → ok
@@ -375,7 +398,7 @@ rclone copyto `
 1. `google_drive_list_files` na pasta-destino → captura `folder.id`, `folder.webViewLink`, e por arquivo seu `id`/`webViewLink`
 2. Cache do `folder.id` por `(cliente, data)` na sessão (evita re-listar)
 
-Se o Drive MCP não estiver disponível, fallback: usar `rclone link <remote>:<path>` (gera URL pública compartilhada — só usar se a política da Stark permitir; default = preferir Drive MCP).
+Se o Drive MCP não estiver disponível, fallback: usar `rclone link <remote>:<path> <TD>` (gera URL pública compartilhada — só usar se a política da Stark permitir; default = preferir Drive MCP).
 
 ### 8.7 Validação pós-upload
 
@@ -398,9 +421,10 @@ transport: "rclone"   # sempre rclone na v1.2+
 ### 8.9 Regras
 
 - **rclone obrigatório.** Se `rclone` não está no PATH, abortar com mensagem pedindo `/video-export --setup-rclone`
-- **Pasta `Clientes/<drive_nome>/`** assumida preexistente no modo padrão. Não existe → **falha clara**, NÃO cria no raiz
-- **`<startFolderId>`** assumida preexistente no modo override. ID inválido → falha clara
-- **Subpastas** (`Cronograma de Conteudo`, `Artes`, ano, mês, data) criadas sob demanda via `rclone mkdir`
+- **`--drive-team-drive` em TODO comando.** Sem ele o rclone opera no Meu Drive pessoal e cria pastas órfãs. Se `config.rcloneTeamDriveId` faltar, usar o default do `squad.yaml` (`0ABl2cpta6dNRUk9PVA`)
+- **Pasta `Clientes/<drive_nome>/`** precisa preexistir no shared drive (gate 8.1.5). Não existe → **`failed`/pendência**, NÃO cria a raiz do cliente em lugar nenhum
+- **`<startFolderId>`** assumida preexistente **dentro do shared drive** no modo override. ID inválido / fora do shared drive → falha clara
+- **Subpastas** (`Cronograma de Conteudo`, `Artes`, ano, mês, data) criadas sob demanda via `rclone mkdir`, sempre sob uma raiz já validada
 - **Mismatch silencioso proibido:** se `drive_nome` está no YAML mas a pasta não existe no Drive, **falha** — NÃO tenta cair pra `cliente`
 - Compactação: após `list folder`, manter só `id`/`name`/`size`. Após `upload`, só `id`/`webViewLink`
 
@@ -614,8 +638,9 @@ clientes:
 
 | Erro                                                  | Ação                                                    |
 |-------------------------------------------------------|---------------------------------------------------------|
-| Pasta `Clientes/<drive_nome>/` não existe             | Falha do par, pendência clara                           |
-| `drive_pasta_ano_id` inválido                         | Falha do par, mensagem pedindo update do clientes.yaml  |
+| Pasta `Clientes/<drive_nome>/` não existe no shared drive | Falha do par, pendência `cliente sem pasta no Drive Compartilhado` — NÃO cria raiz |
+| `drive_pasta_ano_id` inválido / fora do shared drive  | Falha do par, mensagem pedindo update do clientes.yaml  |
+| `--drive-team-drive` ausente / id errado              | Pastas iam pro Meu Drive — sempre passar `<rcloneTeamDriveId>` (config/squad.yaml = `0ABl2cpta6dNRUk9PVA`) |
 | Quota do Drive estourada                              | Falha do par, registra pra retry manual                 |
 | Timeout no upload                                     | 1 retry com backoff 5s, depois falha do par             |
 | MCP do Drive offline                                  | Não aborta — só perde a resolução de URL pós-upload. Fallback: `rclone link` |
@@ -653,8 +678,9 @@ Google Drive (apenas leitura/resolução — upload sai por rclone):
 rclone (CLI):
 - `rclone listremotes` — checar se o remote configurado existe
 - `rclone config show <remote>` — validar tipo `drive`
-- `rclone lsd` / `rclone lsjson` — listar pastas/arquivos remoto, comparar tamanho local vs remoto
-- `rclone mkdir` — criar hierarquia de pastas no Drive
+- `rclone lsd` / `rclone lsjson` / `rclone lsf` — listar pastas/arquivos remoto, gate de pasta do cliente, comparar tamanho local vs remoto
+- `rclone mkdir` — criar hierarquia de pastas no Drive (subpastas, nunca a raiz do cliente)
+- **todos com `--drive-team-drive <rcloneTeamDriveId>`** — mira o shared drive da Stark, não o Meu Drive
 - `rclone copyto` — upload arquivo-a-arquivo (`copyto` preserva o nome de destino exato)
 - `rclone link` — fallback pra URL quando Drive MCP indisponível
 - `rclone config reconnect` — re-autenticar Google se o token expirou
@@ -689,14 +715,17 @@ Substitua `Test-Path X` por `[ -e X ]`, `Get-Item ... | Select LastWriteTime` po
 
 ## 15. Critérios de aceite (checklist)
 
-- [ ] `/video-export` na 1ª vez roda onboarding em ≤ 2 min e cria `config.json` v2 (com `rcloneRemote`)
+- [ ] `/video-export` na 1ª vez roda onboarding em ≤ 2 min e cria `config.json` v3 (com `rcloneRemote` + `rcloneTeamDriveId`)
 - [ ] Onboarding detecta rclone instalado e pula a instalação; quando ausente, mostra comando por SO e revalida em loop
-- [ ] Onboarding cria/escolhe o remote `gdrive:` e valida com `rclone lsd gdrive:Clientes --max-depth 1`
+- [ ] Onboarding cria/escolhe o remote `gdrive:` e valida com `rclone lsd gdrive:Clientes --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1`
 - [ ] Config v1 (sem `rcloneRemote`) dispara só a etapa 6 ao ser carregada, salva como v2
-- [ ] `/video-export --setup-rclone` roda só a etapa 6 mesmo com config v2
+- [ ] Config v2 (sem `rcloneTeamDriveId`) injeta o id do shared drive sem perguntar nada e salva como v3
+- [ ] `/video-export --setup-rclone` roda só a etapa 6 mesmo com config v3
 - [ ] `/video-export` sem flag após onboarding equivale a `--hoje`
 - [ ] `/video-export <pasta>` processa só essa pasta, mesmo se mtime ≠ hoje
 - [ ] `/video-export-task <task_id>` processa só a subtarefa indicada, sem varredura por data
+- [ ] **Todo comando rclone usa `--drive-team-drive` — nenhuma pasta criada no "Meu Drive"**
+- [ ] **Cliente sem pasta no shared drive → pendência, sem criar a raiz**
 - [ ] Par vídeo+capa sobe pra hierarquia Drive correta (padrão ou override) **via `rclone copyto`**
 - [ ] Vídeo > 10MB sobe sem cair no limite do Drive MCP
 - [ ] Comentário ClickUp postado e status muda pra `edição concluída`
@@ -732,3 +761,4 @@ Substitua `Test-Path X` por `[ -e X ]`, `Get-Item ... | Select LastWriteTime` po
 | 2026-06-01 | 1.1    | Template Stark + FR31 (sequencial comentário→status) + overrides clientes.yaml + normalização cliente |
 | 2026-06-01 | 1.1.0  | SKILL.md autocontido para portabilidade Claude Code / Cowork / outros LLMs       |
 | 2026-06-01 | 1.2.0  | rclone obrigatório no onboarding + uploader via `rclone copyto` (resolve cap 10MB do Drive MCP). Novo slash command `/video-export-task <id>` pra entregar uma subtarefa específica. Config migra v1 → v2 sem repetir perguntas. |
+| 2026-06-08 | 1.3.0  | **Conserta upload indo pro "Meu Drive" pessoal.** Todo comando rclone passa `--drive-team-drive 0ABl2cpta6dNRUk9PVA` (Drive Compartilhado da Stark). Gate novo: só sobe pra cliente com pasta oficial no shared drive — senão pendência, nunca cria a raiz. Config migra v2 → v3 injetando `rcloneTeamDriveId` sem perguntar. |

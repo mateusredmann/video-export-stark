@@ -130,7 +130,8 @@ rclone listremotes
     <Enter>   # service_account_file (em branco)
     n         # Edit advanced config? = No
     y         # Use auto config? = Yes (vai abrir o browser pra login Google)
-    n         # Configure as Shared Drive? = No (a menos que você use Shared Drive)
+    n         # Configure as Shared Drive? = No  ← responda N MESMO. O shared drive é
+              #   mirado por flag (--drive-team-drive), não baked no remote. Ver 6.4.
     y         # Confirma
     q         # Quit
 
@@ -143,25 +144,36 @@ rclone listremotes
   ```
 
   > ℹ️ O comando é interativo — Eve mostra a sequência acima e deixa o editor pilotar. Após o wizard fechar, validar com `rclone listremotes` que `gdrive:` apareceu.
+  >
+  > 🆕 **Por que "No" em Shared Drive?** O remote fica apontado pra conta do editor
+  > (auth pessoal). O alvo — o Drive Compartilhado da Stark — é passado em TODO comando
+  > via `--drive-team-drive <rcloneTeamDriveId>` (id versionado em `squad.yaml`). Assim a
+  > skill nunca cria pasta no "Meu Drive" e configs já existentes se corrigem sozinhas
+  > sem refazer o wizard.
 
-#### 6.4 Validar acesso ao Drive da Stark
+#### 6.4 Validar acesso ao Drive Compartilhado da Stark
 
-Confirmar que o remote enxerga a pasta `Clientes/`:
+> O `rcloneTeamDriveId` (`0ABl2cpta6dNRUk9PVA`) vem de `squad.yaml`. Ele aponta pro
+> Drive Compartilhado com as **pastas oficiais de cada cliente**. A skill só sobe arquivos
+> pra cliente que JÁ tem pasta lá — cliente sem pasta vira pendência, nunca cria no Meu Drive.
+
+Confirmar que o remote enxerga a pasta `Clientes/` **dentro do shared drive**:
 
 ```powershell
-rclone lsd gdrive:Clientes --max-depth 1
+rclone lsd gdrive:Clientes --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1
 ```
 
-- **Retornou lista de clientes** → OK, salvar o nome do remote.
+- **Retornou lista de clientes** → OK, salvar o nome do remote + o team-drive id no config.
 - **Erro de permissão / "directory not found"** → mostrar:
   ```
-  ⚠️ O remote 'gdrive:' está configurado mas não enxerga a pasta 'Clientes/'.
+  ⚠️ O remote 'gdrive:' está configurado mas não enxerga 'Clientes/' no Drive Compartilhado.
      Verifica:
        1. O Google logado no rclone é o da Stark (não o pessoal).
-       2. A pasta 'Clientes' está no raiz "My Drive" desse usuário.
+       2. Esse usuário tem acesso ao Drive Compartilhado 0ABl2cpta6dNRUk9PVA.
+       3. A pasta 'Clientes' existe no raiz desse Drive Compartilhado.
      Rode 'rclone config reconnect gdrive:' pra refazer o login se for o caso.
   ```
-  Pedir confirmação manual antes de continuar (o editor pode estar usando override de `drive_pasta_ano_id` pra todos os clientes, caso em que a pasta `Clientes/` não precisa existir).
+  Pedir confirmação manual antes de continuar (o editor pode estar usando override de `drive_pasta_ano_id` pra todos os clientes, caso em que a pasta `Clientes/` não precisa existir — mas as pastas-âncora também precisam estar nesse shared drive).
 
 ## Persistência
 
@@ -175,13 +187,16 @@ Escreve `%USERPROFILE%\.stark-video-export\config.json` com formato:
   "capaExt": ".png",
   "mentionResponsavel": true,
   "rcloneRemote": "gdrive",
+  "rcloneTeamDriveId": "0ABl2cpta6dNRUk9PVA",
   "rcloneCheckedAt": "<ISO timestamp>",
-  "version": 2,
+  "version": 3,
   "createdAt": "<ISO timestamp>"
 }
 ```
 
 > 🆕 Campo `rcloneRemote` adicionado na v2. Configs v1 (sem esse campo) disparam um mini-onboarding só da etapa 6 ao serem carregadas, sem perguntar de novo email/pasta/extensões.
+>
+> 🆕 Campo `rcloneTeamDriveId` adicionado na v3 — id do Drive Compartilhado da Stark. Valor canônico vive em `squad.yaml` (`defaults.rcloneTeamDriveId`); o config.json só guarda uma cópia. Quando ausente, os agentes caem no default do squad.
 
 Cria também os diretórios:
 - `%USERPROFILE%\.stark-video-export\` (raiz)
@@ -210,3 +225,13 @@ Quando Eve carrega a config e detecta `version: 1` (ou ausência do campo `rclon
 2. Executa as etapas 6.1 → 6.4 sem repetir 1-5.
 3. Salva o config preservando todos os campos antigos + `rcloneRemote` + `version: 2`.
 4. Continua o pipeline original.
+
+## Migração v2 → v3 (config sem `rcloneTeamDriveId`)
+
+Quando Eve carrega a config e detecta `version: 2` (ou ausência do campo `rcloneTeamDriveId`):
+
+1. **Sem perguntar nada** — injeta `rcloneTeamDriveId` com o default do `squad.yaml`
+   (`0ABl2cpta6dNRUk9PVA`) e bumpa pra `version: 3`. É o conserto que faz a skill mirar o
+   Drive Compartilhado em vez do Meu Drive.
+2. Roda só a validação 6.4 (`rclone lsd gdrive:Clientes --drive-team-drive <id>`) pra confirmar acesso.
+3. Continua o pipeline original.
