@@ -77,5 +77,5 @@ Detecção do tipo de argumento + algoritmos de parse documentados em [`.claude/
 - **Ano ausente no path/nome** → assume `datetime.now().year` com `WARN: ano inferido = 2026`.
 - **Cliente normalizado sem match no ClickUp** → erro fatal "cliente '<x>' não encontrado nas subtarefas com data <DD-MM>"; sugere top-5 levenshtein vs `parent.name` da semana.
 - **Cliente está no `clientes.yaml` com `clickup_alias`** → usa o alias na busca ClickUp. Pasta local continua usando o nome extraído pelo Scanner (`<cliente>` literal).
-- **Override `drive_pasta_reels_id`** → resolve caminho humano via `google_drive_get_file_metadata` ou usa `--drive-root-folder-id <id>` no rclone (sempre com `<TD>`). Subpath renderizado a partir de `drive_reels_subpath_template`.
+- **Override `drive_pasta_reels_id`** → resolve caminho humano via `google_drive_get_file_metadata` ou usa `--drive-root-folder-id <id>` no rclone (sempre com `<TD>`). Subpath renderizado a partir de `drive_reels_subpath_template` (default v1.4: `{ano}/{mes_extenso}/{DD-MM-YYYY}`).
 - **Override `drive_pasta_ano_id` (legado)** → ignorado pelo Uploader nesta skill. Era pra artes estáticas no `prep-agenda-stark`.

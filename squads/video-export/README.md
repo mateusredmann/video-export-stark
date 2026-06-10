@@ -70,15 +70,23 @@ Por que: o MCP do Google Drive rejeita uploads > 10MB. Vídeos editados quase se
 
 ```yaml
 clientes:
-  "Dr. Anderson Kuboniwa":
-    drive_nome: "Dr. Anderson"
-    drive_pasta_ano_id: "1938YPt9KZtC..."
+  "Diego Gonzalez":
+    drive_nome: "Dr Diego Gonzalez"          # pasta no Drive ≠ nome extraído pelo Scanner
 
-  "Dr. Gilberto Filho":
-    drive_pasta_ano_id: "1PU7nohuXw-..."
+  "Dr. Foo":
+    drive_pasta_reels_id: "<folderId>"       # pasta-âncora alternativa (fora do padrão clientes/<cli>/cronograma de conteúdo/)
+    drive_reels_subpath_template: "{ano}/{mes_extenso}/{DD-MM-YYYY}"   # default igual ao padrão
 ```
 
-Clientes sem entrada usam a hierarquia padrão automaticamente. Importado do upstream `prep-agenda-stark/config/figma-files.yaml`.
+Clientes sem entrada usam a hierarquia padrão automaticamente. Campo `drive_pasta_ano_id` é legado (artes estáticas) — Uploader ignora pra vídeos.
+
+### Hierarquia destino Drive (modo padrão — v1.4)
+
+```
+clientes/<drive_nome OR cliente>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/
+```
+
+Os três wrappers (`clientes/`, `<cliente_drive>/`, `cronograma de conteúdo/`) são **preexistentes** no shared drive — Uploader faz fuzzy match normalizado pra encontrar o nome real, mas NUNCA cria. Só `<ano>/`, `<mes_extenso>/` e `<DD-MM-YYYY>/` são criáveis sob demanda. Wrappers ausentes → pendência específica.
 
 ## Convenção de pasta-raiz
 

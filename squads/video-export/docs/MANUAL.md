@@ -89,25 +89,40 @@ Migrações silenciosas: v1 (sem `rcloneRemote`) → dispara etapa 6 do onboardi
 | Campo | Uso |
 |---|---|
 | `drive_nome` | Pasta no Drive ≠ nome local. |
-| `drive_pasta_ano_id` | Estrutura fora de `Clientes/<cli>/Cronograma/Artes/<ano>`. |
+| `drive_pasta_reels_id` | Pasta-âncora alternativa (estrutura fora do padrão `clientes/<cli>/cronograma de conteúdo/`). |
+| `drive_reels_subpath_template` | Template do subpath dentro da âncora (default: `{ano}/{mes_extenso}/{DD-MM-YYYY}`). |
 | `clickup_alias` | Tarefa-mãe no ClickUp ≠ pasta local. |
+| `drive_pasta_ano_id` *(legado)* | Era pra artes estáticas — Uploader ignora pra vídeos. |
 
 **Convenção de pasta-raiz:**
 ```
 <videoRoot>\<Cliente>\<DD-MM-YYYY>\reels-01.mp4 + reels-01.png + ...
 ```
 
-**Hierarquia destino Drive (modo padrão):**
+**Hierarquia destino Drive (modo padrão — v1.4):**
 ```
-Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso>/<DD-MM-YYYY>/
-```
-
-**Modo override (`drive_pasta_ano_id`):**
-```
-<startFolderId>/<MM. mes-extenso>/<DD-MM-YYYY>/
+clientes/<drive_nome OR cliente>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/
 ```
 
-Pasta-âncora preexistente: se não existe no shared drive → pendência, nunca cria a raiz.
+Regra de criação seletiva:
+
+| Nível                       | Cria?       |
+|-----------------------------|-------------|
+| `clientes/`                 | **NÃO** (preexistente — fuzzy match exato normalizado) |
+| `<cliente_drive>/`          | **NÃO** (preexistente — fuzzy match, usa `drive_nome` se override) |
+| `cronograma de conteúdo/`   | **NÃO** (preexistente — fuzzy match com "cronograma" + "conteudo") |
+| `<ano>/`                    | **SIM** (sob demanda; ex.: `2026`) |
+| `<mes_extenso>/`            | **SIM** (sob demanda; reusa `JUN`/`06`/`JUN26`/etc. se existir, senão cria `junho`) |
+| `<DD-MM-YYYY>/`             | **SIM** (sempre; ex.: `19-06-2026`) |
+
+**Modo override (`drive_pasta_reels_id`):**
+```
+<startFolderId>/<subpath renderizado a partir de drive_reels_subpath_template>/
+```
+
+Default do template: `{ano}/{mes_extenso}/{DD-MM-YYYY}`. No override todo o subpath é criável (a âncora é a fronteira). Tokens: `{ano}`, `{mes}`, `{mes_extenso}`, `{MMMAA}`, `{DD-MM}`, `{DD-MM-YYYY}`.
+
+Wrappers ausentes (modo padrão) → pendência específica (`wrapper_clientes_ausente`, `cliente_sem_pasta_no_drive`, `cronograma_de_conteudo_ausente`), nunca cria.
 
 ## 5. Dependências
 
@@ -119,7 +134,7 @@ Pasta-âncora preexistente: se não existe no shared drive → pendência, nunca
 
 1. **FR31 — Sequencial no Noti.** `clickup_create_task_comment` + `clickup_update_task` nunca em paralelo na mesma subtarefa (ClickUp dropa o comentário silenciosamente). Ordem: comentário → await → confirma `comment_id` → status → await.
 2. **`--drive-team-drive` em TODO comando rclone.** Sem ele cai no Meu Drive pessoal.
-3. **Pasta-âncora preexistente (FR21).** Skill nunca cria `Clientes/<cliente>/` nem `<startFolderId>`.
+3. **Wrappers preexistentes (FR21).** Skill nunca cria `clientes/`, `<cliente_drive>/` nem `cronograma de conteúdo/`. Só cria `<ano>/`, `<mes_extenso>/` e `<DD-MM-YYYY>/`. No modo override, só a âncora `<startFolderId>` é preexistente.
 4. **Normalização cliente (FR19a).** Remove `Dr.`/`Dra.`, lowercase, sem acento, trim — antes de qualquer comparação.
 5. **Mismatch silencioso proibido (FR25a).** `drive_nome` no YAML + pasta inexistente → falha, NÃO cai pro `cliente`.
 6. **Match read-only.** Sem subtarefa → pendência, nunca cria.
@@ -130,11 +145,14 @@ Pasta-âncora preexistente: se não existe no shared drive → pendência, nunca
 | Sintoma | Causa | Ação |
 |---|---|---|
 | `rclone não detectado` | Fora do PATH | `/video-export --setup-rclone` |
-| `remote não enxerga 'Clientes/'` | Google errado | `rclone config reconnect gdrive:` |
+| `remote não enxerga 'clientes/'` | Google errado | `rclone config reconnect gdrive:` |
 | `subtarefa não encontrada` | Nome ≠ ClickUp | Adicionar `clickup_alias` no YAML |
 | Comentário sumiu + status mudou | Violou FR31 | Bug — Noti deve ser sequencial |
 | Upload trava em arquivo grande | Caiu no Drive MCP | Verificar `transport: "rclone"` |
-| `pasta 'Clientes/<cliente>/' inexistente` | Pasta-âncora ausente | Criar no Drive ou usar override no YAML |
+| `wrapper_clientes_ausente` | Raiz do shared drive sem `clientes/` | Criar `clientes/` manualmente no shared drive |
+| `cliente_sem_pasta_no_drive` | `clientes/<cliente>/` ausente | Criar pasta do cliente em `clientes/` (onboarding do cliente) |
+| `cronograma_de_conteudo_ausente` | Pasta-âncora ausente dentro do cliente | Criar `cronograma de conteúdo/` no cliente OU usar override `drive_pasta_reels_id` |
+| `output.fuzzy[]` populado | Match não-exato no gate | Ver no relatório qual wrapper caiu no fuzzy — pode indicar inconsistência de nomenclatura no Drive |
 | `--hoje` lista `clickup_sem_arquivo` | Tarefa vence hoje, vídeo não foi editado/exportado | Checar `videoRoot\<Cliente>\<DD-MM-YYYY>` no PC |
 | `--hoje` lista `fs_sem_subtask` | Vídeo editado hoje sem tarefa correspondente | Adicionar `clickup_alias` ou criar subtarefa |
 | `--hoje` aborta `editorEmail ausente` | Config sem e-mail do editor | `/video-export --reconfigure` |

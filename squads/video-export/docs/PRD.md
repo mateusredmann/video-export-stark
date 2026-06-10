@@ -1,6 +1,6 @@
 # Squad Video Export — PRD
 
-**Owner:** Mateus Redmann | **Status:** Draft (v1.1) | **Atualizado:** 2026-06-01
+**Owner:** Mateus Redmann | **Status:** Draft (v1.4) | **Atualizado:** 2026-06-10
 
 ---
 
@@ -68,15 +68,17 @@ Zero interação humana após o disparo (depois do onboarding).
 - **FR19b:** Consultar `clickup_alias` em `config/clientes.yaml` se disponível antes da busca.
 
 ### Up — Upload
-- **FR20:** Hierarquia destino padrão: `Clientes/<drive_nome OR cliente>/Cronograma de Conteudo/Artes/<ano>/<mes-extenso>/<DD-MM-YYYY>/`.
-- **FR20a:** Modo override (quando cliente tem `drive_pasta_ano_id` em `clientes.yaml`): `<startFolderId>/<MM. mês>/<DD-MM-YYYY>/`. Pula a navegação automática.
-- **FR20b:** Lookup obrigatório em `config/clientes.yaml` antes de construir o caminho. Campos: `drive_nome`, `drive_pasta_ano_id`, `clickup_alias`.
-- **FR21:** Criar subpastas faltantes; **não** criar `Clientes/<cliente>/` nem a pasta-âncora `<startFolderId>` (ambas assumidas preexistentes, falha se não).
+- **FR20:** Hierarquia destino padrão (v1.4): `clientes/<drive_nome OR cliente>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/`. Os três wrappers (`clientes/`, `<cliente_drive>/`, `cronograma de conteúdo/`) são preexistentes — a skill faz fuzzy match normalizado pra encontrar o nome real no Drive (preserva case/acento original), mas NUNCA cria.
+- **FR20a:** Modo override (quando cliente tem `drive_pasta_reels_id` em `clientes.yaml`): `<startFolderId>/<subpath renderizado a partir de drive_reels_subpath_template>/`. Template default: `{ano}/{mes_extenso}/{DD-MM-YYYY}`. No override todo o subpath é criável (a âncora é a fronteira). Pula a navegação automática.
+- **FR20b:** Lookup obrigatório em `config/clientes.yaml` antes de construir o caminho. Campos: `drive_nome`, `drive_pasta_reels_id`, `drive_reels_subpath_template`, `clickup_alias`. Campo legado `drive_pasta_ano_id` é ignorado pra vídeos.
+- **FR21:** Criação seletiva. **CRIA sob demanda** apenas `<ano>/`, `<mes_extenso>/` e `<DD-MM-YYYY>/`. **NÃO cria** `clientes/`, `<cliente_drive>/` nem `cronograma de conteúdo/` — ausentes → `failed` com motivo específico (`wrapper_clientes_ausente`, `cliente_sem_pasta_no_drive`, `cronograma_de_conteudo_ausente`). Modo override: pasta-âncora preexistente, subpath inteiro criável.
+- **FR21a:** Fuzzy match normalizado pra wrappers. `normalize(s)` = lowercase + strip diacríticos (preserva `ç`→`c`) + remove pontuação trivial + collapse whitespace + trim. Exato wins sobre fuzzy. Toda decisão fuzzy registrada em `output.fuzzy[]` pra auditoria.
+- **FR21b:** Match fuzzy do mês ao criar — se já existe pasta reconhecível como o mês alvo em qualquer formato (`junho`, `JUN`, `06`, `JUN26`, `junho-2026`), reusa. Senão cria com **extenso lowercase pt-br** (`junho`, `março` com cedilha).
 - **FR22:** Idempotência: skip se arquivo já existe com mesmo nome e tamanho. `--force` sobrescreve.
 - **FR23:** Upload paralelo vídeo+capa pra mesma pasta-destino.
 - **FR24:** Validação pós-upload: listar pasta-destino e confirmar presença.
 - **FR25:** 1 retry automático em timeout (backoff 5s); depois falha.
-- **FR25a:** Mismatch silencioso proibido: se `drive_nome` está no YAML mas a pasta não existe no Drive, falha — não cai pra `cliente`.
+- **FR25a:** Mismatch silencioso proibido: se `drive_nome` está no YAML mas a pasta não existe no Drive (mesmo no fuzzy), falha — não cai pra `cliente`.
 
 ### Noti — Notificação
 - **FR26:** Postar comentário no template padrão Stark:
@@ -103,11 +105,13 @@ Zero interação humana após o disparo (depois do onboarding).
 ```
 
 ### Conversão local → Drive
-| Local (input editor)            | Drive (output)                                            |
-|---------------------------------|-----------------------------------------------------------|
-| Pasta-pai do vídeo              | `Clientes/<pasta-pai>/`                                   |
-| Subpasta `DD-MM-YYYY`           | `Cronograma de Conteudo/Artes/<ano>/<mês>/<DD-MM-YYYY>/`  |
-| `nome-raiz.mp4` + `nome-raiz.png` | mesmos nomes, mesma pasta-destino                       |
+| Local (input editor)            | Drive (output)                                                          |
+|---------------------------------|-------------------------------------------------------------------------|
+| (raiz)                          | `clientes/` (preexistente — fuzzy exato)                                |
+| Pasta-pai do vídeo              | `<cliente_drive>/` (preexistente — fuzzy, usa `drive_nome` se override) |
+| (anchor fixo)                   | `cronograma de conteúdo/` (preexistente — fuzzy)                        |
+| Subpasta `DD-MM-YYYY`           | `<ano>/<mes_extenso>/<DD-MM-YYYY>/` (criado sob demanda)                |
+| `nome-raiz.mp4` + `nome-raiz.png` | mesmos nomes, mesma pasta-destino                                     |
 
 ### Idempotência
 - Arquivo destino existe com mesmo tamanho → pula
@@ -151,7 +155,7 @@ Zero interação humana após o disparo (depois do onboarding).
 
 ### Drive
 ```
-Clientes/Dr. Rodolfo Soares/Cronograma de Conteudo/Artes/2026/maio/27-05-2026/
+clientes/Dr. Rodolfo Soares/cronograma de conteúdo/2026/maio/27-05-2026/
 ├── reels-01.mp4
 └── reels-01.png
 ```
@@ -217,3 +221,10 @@ Pendências: 1
 |            |        | • FR31: sequencial obrigatório comentário→status (fix anti-drop)           |
 |            |        | • FR20a/b: overrides por cliente em `config/clientes.yaml`                 |
 |            |        | • FR19a: normalização cliente com remoção de `Dr.`/`Dra.` antes do match   |
+| 2026-06-10 | 1.4    | Hierarquia destino reescrita (FR20/FR21):                                  |
+|            |        | • `clientes/<cliente_drive>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/` |
+|            |        | • Os três wrappers (`clientes`, `<cliente_drive>`, `cronograma de conteúdo`) são preexistentes — fuzzy match normalizado, nunca cria |
+|            |        | • Só `<ano>`, `<mes_extenso>` e `<DD-MM-YYYY>` são criáveis sob demanda     |
+|            |        | • FR21a: fuzzy normalizado (lowercase + strip diacríticos + collapse) + auditoria em `output.fuzzy[]` |
+|            |        | • FR21b: mês reusa qualquer formato existente (junho/JUN/06/JUN26); cria como extenso lowercase pt-br |
+|            |        | • Default `drive_reels_subpath_template` do override: `{ano}/{mes_extenso}/{DD-MM-YYYY}` (era `{DD-MM-YYYY}`) |
