@@ -12,3 +12,6 @@ node_modules/
 # mas pode aparecer na raiz se rodado fora do diretorio canonico)
 /config.json
 /logs/
+
+# Build output local (zip + pasta gerada por scripts de empacotamento)
+/dist/
