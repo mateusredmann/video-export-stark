@@ -154,26 +154,27 @@ rclone listremotes
 #### 6.4 Validar acesso ao Drive Compartilhado da Stark
 
 > O `rcloneTeamDriveId` (`0ABl2cpta6dNRUk9PVA`) vem de `squad.yaml`. Ele aponta pro
-> Drive Compartilhado com as **pastas oficiais de cada cliente**. A skill só sobe arquivos
-> pra cliente que JÁ tem pasta lá — cliente sem pasta vira pendência, nunca cria no Meu Drive.
+> Drive Compartilhado com as **pastas oficiais de cada cliente direto na raiz** —
+> não há wrapper `Clientes/`. A skill só sobe arquivos pra cliente que JÁ tem pasta
+> lá; cliente sem pasta vira pendência, nunca cria no Meu Drive.
 
-Confirmar que o remote enxerga a pasta `Clientes/` **dentro do shared drive**:
+Confirmar que o remote enxerga a raiz do shared drive (lista de clientes):
 
 ```powershell
-rclone lsd gdrive:Clientes --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1
+rclone lsd gdrive: --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1
 ```
 
-- **Retornou lista de clientes** → OK, salvar o nome do remote + o team-drive id no config.
-- **Erro de permissão / "directory not found"** → mostrar:
+- **Retornou lista com pastas de cliente** (`Dr Diego Gonzalez/`, `Dra Luiza Coutinho/`, ...) → OK, salvar o nome do remote + o team-drive id no config.
+- **Erro de permissão / "directory not found" / lista vazia** → mostrar:
   ```
-  ⚠️ O remote 'gdrive:' está configurado mas não enxerga 'Clientes/' no Drive Compartilhado.
+  ⚠️ O remote 'gdrive:' está configurado mas não enxerga a raiz do Drive Compartilhado.
      Verifica:
        1. O Google logado no rclone é o da Stark (não o pessoal).
        2. Esse usuário tem acesso ao Drive Compartilhado 0ABl2cpta6dNRUk9PVA.
-       3. A pasta 'Clientes' existe no raiz desse Drive Compartilhado.
+       3. O ID `0ABl2cpta6dNRUk9PVA` é o do Drive Compartilhado correto (vide squad.yaml).
      Rode 'rclone config reconnect gdrive:' pra refazer o login se for o caso.
   ```
-  Pedir confirmação manual antes de continuar (o editor pode estar usando override de `drive_pasta_ano_id` pra todos os clientes, caso em que a pasta `Clientes/` não precisa existir — mas as pastas-âncora também precisam estar nesse shared drive).
+  Pedir confirmação manual antes de continuar.
 
 ## Persistência
 

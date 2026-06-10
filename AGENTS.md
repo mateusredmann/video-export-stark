@@ -2,64 +2,40 @@
 
 Pipeline de 5 agentes que entrega vídeos editados ao cliente via Drive + ClickUp.
 
-## Cadeia de execução — modo varredura (`/video-export`)
+## Cadeia — modo varredura (`/video-export`)
 
 ```
-[Eve export-chief]
-   │  valida flags, carrega/cria config do editor, pré-flight do rclone
-   │
-[Scan scanner]
-   │  varre pasta-raiz, descobre pares (video, capa, cliente, data)
-   │
-[Match matcher] ─── em paralelo (3-4 simultâneos por par)
-   │  busca subtarefa ClickUp por cliente+data
-   │
-[Up uploader] ──── em paralelo (3-4 simultâneos por par)
-   │  rclone copyto vídeo + capa → Drive (sem cap de 10MB)
-   │
-[Noti notifier]
-      comenta link no ClickUp, @responsável, status = edição concluída
+[Eve]   valida flags, carrega/cria config do editor, pré-flight do rclone
+[Scan]  varre pasta-raiz, descobre pares (video, capa, cliente, data)
+[Match] ─┐
+[Up]     ├─ paralelo, 3-4 simultâneos por par
+[Noti]  ─┘   comenta link no ClickUp, @responsável, status="edição concluída"
 ```
 
-## Cadeia de execução — modo alvo único (`/video-export-task <id>`)
+## Cadeia — modo alvo único (`/video-export-task <id|url|caminho>`)
 
 ```
-[Eve]   carrega config + pré-flight rclone + parseia task_id
-   │
-[Match em modo REVERSO]  clickup_get_task(id) → deriva cliente + data + parent_assignees
-   │
-[Scan dirigido]  procura pasta-data esperada (+ fallbacks) → 1 par filtrado
-   │
-[Up rclone]  upload do par único
-   │
-[Noti]  comenta na subtask + @ + status (sequencial FR31)
+[Eve]   config + pré-flight rclone + parseia argumento
+[Match reverso/path]  deriva cliente+data (do ClickUp ou do nome/path) + parent_assignees
+[Scan dirigido]       acha pasta-data esperada (+ fallbacks) → 1 par filtrado
+[Up rclone]           upload do par único
+[Noti]                comenta + @ + status (sequencial FR31)
 ```
 
-Falha em um par não aborta os demais — agrega no relatório final.
+Falha em um par não aborta os demais.
 
-## Pontos não-óbvios
+## ⚠️ FR31 — Sequencial obrigatório no Noti
 
-- **Cliente** vem **sempre** do nome da pasta-pai. Match normaliza removendo `Dr.`/`Dra.`, lowercase e acentos antes de comparar com ClickUp. Se ainda assim não acha, vai pra pendências.
-- **Data** prefere o nome da subpasta no formato `DD-MM-YYYY`. Fallback: `mtime` do arquivo de vídeo.
-- **Par vídeo+capa** = mesmo nome-raiz (`reels-01.mp4` + `reels-01.png`). Arquivos órfãos (vídeo sem capa ou capa sem vídeo) entram nas pendências.
-- **Status final fixo:** `edição concluída`. Não é configurável via onboarding.
-- **Cache do editor:** `%USERPROFILE%\.stark-video-export\config.json` (schema v3 inclui `rcloneRemote` + `rcloneTeamDriveId`). Para reconfigurar tudo, `--reconfigure`; só rclone, `--setup-rclone`. Configs v1→v2 e v2→v3 ganham migração silenciosa na próxima execução.
-- **rclone obrigatório a partir da v1.2.** O MCP do Google Drive rejeita uploads > 10MB e vídeos editados quase sempre passam disso. Up usa `rclone copyto` — Drive MCP só é usado pós-upload pra resolver `webViewLink`/IDs.
-- **Drive Compartilhado (v1.3).** Todo comando rclone roda com `--drive-team-drive 0ABl2cpta6dNRUk9PVA` (`config.rcloneTeamDriveId`) pra mirar o shared drive da Stark, não o "Meu Drive" pessoal. Só sobe pra cliente com pasta oficial lá; senão pendência, nunca cria a raiz.
-- **Modo reverso do Match** (`/video-export-task <id>`): a partir do `task_id` da subtarefa, Match deriva cliente (folder/list → parent name → regex no subtask.name) e data (regex no nome → `due_date`). Falha → erro fatal com candidatos, nunca infere.
-- **Overrides por cliente:** `squads/video-export/config/clientes.yaml` mapeia clientes que têm `drive_nome` ou `drive_pasta_ano_id` diferente do padrão. Importado do prep-agenda-stark — manter sincronizado.
-- **Idempotência:** se a pasta no Drive já tem o arquivo, pula. Com `--force`, sobrescreve.
+NUNCA `clickup_create_task_comment` + `clickup_update_task` em paralelo na mesma subtarefa. O ClickUp dropa o comentário silenciosamente. Ordem: comentário (await + confirma `comment_id`) → status.
 
-## ⚠️ Regra crítica — sequencial obrigatório no ClickUp
+## Pontos não-óbvios (que não estão no README/PRD)
 
-Noti NUNCA chama `clickup_create_task_comment` e `clickup_update_task` em paralelo. O ClickUp dropa o comentário silenciosamente quando os dois competem na mesma subtarefa. Ordem: comentário primeiro (await + confirma `comment_id`), depois status.
-
-## Template de comentário (padrão Stark)
-
-```
-[@responsável] ✅ Edição concluída.
-Ref: <cliente> — <DD-MM> <nome_raiz>
-Entregue: vídeo (.mp4) + capa (.png)
-
-🔗 Drive: <drive_folder_url>
-```
+- **Cache do editor:** `%USERPROFILE%\.stark-video-export\config.json` (schema v3). Migrações silenciosas v1→v2 (etapa 6 do onboarding) e v2→v3 (injeta `rcloneTeamDriveId` sem perguntar).
+- **Estrutura local:** `<videoRoot>\<ano>\<ano> - <Mês>\<DD-MM> <Cliente>\<arquivos>`. Cliente+data são extraídos do **nome da pasta-alvo** (`^(\d{2})-(\d{2})\s+(.+)$`); ano vem da pasta-avó. Pasta que não bate o regex é silenciosamente pulada.
+- **Variantes `-SEM.mp4`** (sem-legenda) são silenciosamente descartadas pelo Scanner.
+- **Capa é opcional.** Vídeo sem `.png` correspondente sobe só o vídeo — não vira pendência.
+- **Estrutura no Drive (default):** `<cliente>/01. Cronograma de Reels | <cliente>/<DD-MM-YYYY>/`. Clientes ficam direto na raiz do shared drive — **sem wrapper `Clientes/`**. Override por cliente via `drive_pasta_reels_id` + `drive_reels_subpath_template` no `clientes.yaml`.
+- **Match reverso** (`/video-export-task <id>`): cliente vem por `folder.name` → `parent.name` → regex no `subtask.name`. Data: regex no `subtask.name` → `due_date` da subtarefa → da mãe.
+- **Modo path** (`/video-export-task <caminho>`): cliente+data extraídos do filename → nome da pasta → path ascendente (`2026/2026 - Junho/16-06 Janete`). Falha → erro fatal pedindo rename.
+- **Compactação:** após cada API call (ClickUp, Drive, rclone lsjson), agentes mantêm só o subset usado a jusante.
+- **`clientes.yaml`** mapeia overrides (`drive_nome`, `drive_pasta_reels_id`, `drive_reels_subpath_template`, `clickup_alias`). Campo legado `drive_pasta_ano_id` (importado do `prep-agenda-stark`) é ignorado nesta skill — era pra artes estáticas.

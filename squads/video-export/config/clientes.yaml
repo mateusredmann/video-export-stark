@@ -1,70 +1,86 @@
 # Video Export — Overrides por cliente
 #
-# A maioria dos clientes não precisa de override. O Up (uploader) usa a hierarquia
-# padrão `Clientes/<cliente>/Cronograma de Conteudo/Artes/<ano>/<mês>/<DD-MM-YYYY>/`.
+# A maioria dos clientes NÃO precisa de override. O Up (uploader) usa a hierarquia padrão:
+#   <cliente_drive>/01. Cronograma de Reels | <cliente_drive>/<DD-MM-YYYY>/
+# direto na raiz do Drive Compartilhado (não há wrapper Clientes/).
 #
 # Use este arquivo quando algum cliente:
-#   1. Tem pasta no Drive com nome diferente do que aparece no ClickUp / pasta local
-#   2. Tem estrutura de pastas não-padrão (precisa apontar pra pasta-âncora direto)
-#   3. Tem nome no ClickUp diferente da pasta local (clickup_alias)
+#   1. Tem pasta no Drive com nome diferente do que o Scanner extrai do nome da pasta-local
+#   2. Tem pasta-âncora de reels em local não-padrão (não em "01. Cronograma de Reels | <cliente>")
+#   3. Tem nome no ClickUp diferente do nome do cliente extraído pelo Scanner
 #
 # CAMPOS DISPONÍVEIS:
-#   drive_nome:         Nome real da pasta no Drive (quando diferente do nome local)
-#   drive_pasta_ano_id: ID da pasta-âncora no Drive (pula navegação automática).
-#                       Quando preenchido, upload vai pra [pasta-âncora] / [MM. mês] / [DD-MM-YYYY]
-#   clickup_alias:      Alias usado na busca de subtarefa no ClickUp
-#                       (quando o nome no ClickUp difere da pasta local)
+#   drive_nome:                   Nome real da pasta no Drive (quando diferente do nome extraído pelo Scanner).
+#                                 Ex.: Scanner extrai "Diego Gonzalez" da pasta local "19-06 Diego Gonzalez";
+#                                 no Drive a pasta é "Dr Diego Gonzalez".
 #
-# Importados do prep-agenda-stark/squads/prep-agenda/config/figma-files.yaml @ d1d4de5.
-# Manter sincronizado com aquele arquivo conforme novos clientes ganham estrutura não-padrão.
+#   drive_pasta_reels_id:         ID da pasta-âncora dos reels (skip o default "01. Cronograma de Reels | <cliente>").
+#                                 Use quando o cliente tem reels num lugar não-padrão.
+#
+#   drive_reels_subpath_template: Template do subpath DENTRO da âncora. Default: "{DD-MM-YYYY}".
+#                                 Tokens: {ano}, {mes} (2 dígitos), {mes_extenso} (junho), {MMMAA} (JUN26),
+#                                         {DD-MM}, {DD-MM-YYYY}.
+#                                 Vazio ("") → sobe direto na âncora sem subpasta.
+#
+#   clickup_alias:                Alias usado na busca de subtarefa no ClickUp
+#                                 (quando o nome no ClickUp difere do extraído pelo Scanner).
+#
+# CAMPO LEGADO (não usar pra vídeos):
+#   drive_pasta_ano_id:           Era pra artes estáticas (importado do prep-agenda-stark).
+#                                 Mantido só por compat — o Uploader ignora pra reels.
 
 clientes:
 
+  # Exemplo — Diego Gonzalez: pasta-local "19-06 Diego Gonzalez", pasta-Drive "Dr Diego Gonzalez"
+  "Diego Gonzalez":
+    drive_nome: "Dr Diego Gonzalez"
+
+  # Exemplo — Luiza Coutinho: idem, mas com prefixo "Dra"
+  "Luiza Coutinho":
+    drive_nome: "Dra Luiza Coutinho"
+
+  "Jussara":
+    drive_nome: "Dra Jussara"
+    clickup_alias: "Jussara Lazarini"   # subtarefas ClickUp usam o sobrenome
+
+  "Fernanda Marció":
+    drive_nome: "Dra Fernanda Marció"
+
+# Clientes sem entrada aqui caem no modo padrão:
+#   pasta-Drive = nome extraído pelo Scanner (case-sensitive)
+#   pasta-âncora = "01. Cronograma de Reels | <pasta-Drive>"
+#   subpath = "{DD-MM-YYYY}"
+#
+# Se a busca falhar (raiz inexistente no shared drive OU âncora ausente OU subtarefa não encontrada),
+# vai pra pendências — Uploader e Matcher NUNCA criam pasta-raiz nem task nova.
+
+# Entradas legadas do prep-agenda-stark (estrutura de artes — não aplicável a vídeos)
+# Mantidas só pra referência cruzada; o Uploader ignora drive_pasta_ano_id pra reels.
+legacy_artes:
   "Dr. Anderson Kuboniwa":
     drive_nome: "Dr. Anderson"
     drive_pasta_ano_id: "1938YPt9KZtCIWMd16K4Q2NNtQeEuCFHl"
-    # CRIATIVOS INSTAGRAM | DR. ANDERSON — estrutura: [pasta] / [MM. MÊS YYYY] / [data] [Tipo]
 
   "Dr. Gilberto Filho":
     drive_pasta_ano_id: "1PU7nohuXw-buXweXiKzDvPV-omlx_fDg"
-    # Artes 2026 | Dr. Gilberto Filho — estrutura: Artes 2026 / [MM. MÊS] / [data] [Tipo]
 
   "Dr. Luciano Esteves":
     drive_pasta_ano_id: "1Jo-Us_7hgKetMB4JYRV2NA90F-oAuSMh"
-    # 03. Cronograma de Conteúdo | Dr Luciano Esteves — estrutura: [pasta] / [MM. MÊS] / [data] [Tipo]
 
   "Dra. Ana Paula Polato":
     drive_pasta_ano_id: "17YJgcAYC0GM47ur9HUMKVWhCHZMJVf2w"
-    # Criativos Instagram — estrutura: [pasta] / [MM. MÊS] / [data] [Tipo]
 
   "Dra. Anne Groth":
     drive_pasta_ano_id: "1MWjxwRcrRsewp2lHajOXwg-YnLPt5LFp"
-    # pasta de artes da Dra. Anne Groth
 
   "Dr. Cadu Gazzinelli":
     drive_pasta_ano_id: "1URChbjVFimvt5lQzrvxPezKqFo0ItTEo"
-    # pasta de artes do Dr. Cadu Gazzinelli
 
   "Dr. Marcelo Azevedo":
     drive_pasta_ano_id: "15Wgzhp7jntlG7vqbiZVR0fMIfgnc036L"
-    # pasta de artes do Dr. Marcelo Azevedo
 
   "Dr. Felipe Máximo":
     drive_pasta_ano_id: "1g-y4GZXlxr4J3eSuET-bfiQKY0I7BaP1"
-    # pasta de artes do Dr. Felipe Máximo
 
   "Empoderatti":
     drive_pasta_ano_id: "1X_fxEdinSg3BmF0t4r_eExFT07xIFDZ5"
-    # pasta 2026 — está dentro da pasta de uma doutora, não em Clientes/Empoderatti
-
-# Clientes sem entrada aqui usam o modo padrão automaticamente:
-#   - Dra. Graciela Machado
-#   - Dra. Amandia Marchetti
-#   - Dr. Matheus Ocampo
-#   - Dra. Nicolle Andrade
-#   - Dra. Taíssa Recalde
-#   - Dr. Ricardo Martins
-#   - Dr. Rodolfo Soares
-#   - Dr. Daniel Valente
-#   - Dra. Leslye Sartori
-#   - Destra Desenvolvimento Mineral

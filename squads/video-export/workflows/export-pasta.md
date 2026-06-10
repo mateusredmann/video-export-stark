@@ -3,42 +3,18 @@ name: export-pasta
 trigger: "/video-export <pasta>"
 ---
 
-# Workflow: Export Pasta (modo manual)
+# Workflow: Export Pasta
 
-Editor aponta uma pasta específica. A skill processa só o conteúdo dessa pasta.
-
-## Pipeline
+Editor aponta uma pasta específica. A skill processa só o conteúdo dela.
 
 ```
-1. Eve carrega config.json (ou dispara onboarding se ausente)
-2. Eve valida que <pasta> existe
-3. Scan varre <pasta> em modo "pasta"
-4. Pra cada par retornado: dispara em paralelo
-     ├─ Match resolve subtarefa ClickUp
-     ├─ Up faz upload Drive
-     └─ Noti comenta + muda status
+1. Eve carrega config.json + pré-flight rclone
+2. Valida que <pasta> existe (Test-Path)
+3. Scan modo "pasta" (não desce em subpastas-cliente)
+4. Pra cada par: Match → Up → Noti (paralelo, lotes de 4)
 5. Eve consolida relatório
 ```
 
-## Exemplo
+Exemplo: `/video-export "D:\Stark MKT\02 - Videos\2026\2026 - Junho\19-06 Diego Gonzalez"` → cliente = `Diego Gonzalez` (extraído do nome da pasta), data = `19-06-2026` (dia+mês do nome + ano da pasta-avó `2026 - Junho`). Capa `.png` é opcional — sem ela, sobe só vídeo. Variantes `-SEM.mp4` descartadas.
 
-```
-/video-export "D:\Edicoes\Dr. Rodolfo Soares\27-05-2026"
-```
-
-Scan encontra:
-```
-- reels-01.mp4 + reels-01.png
-- reels-02.mp4 + reels-02.png
-- reels-03.mp4 (sem capa → órfão)
-```
-
-Cliente extraído da pasta-pai = `Dr. Rodolfo Soares`.
-Data extraída da subpasta = `27-05-2026`.
-
-Processa os 2 pares em paralelo, registra o órfão na pendência.
-
-## Edge cases
-
-- **Pasta sem subpasta-data** (ex: `D:\Edicoes\Dr. X\videos-soltos`): Scan usa mtime como data. Pode resultar em datas diferentes pro mesmo lote — comportamento esperado.
-- **Pasta no formato errado** (não tem cliente identificável): Eve avisa e oferece input manual de cliente. (v1: avisa e pula.)
+Pasta-avó sem padrão `<ano> - <Mês>` → ano vem do mtime do vídeo. Pasta-alvo que não bate `<DD-MM> <Cliente>` → erro fatal pedindo verificação do path (modo `pasta` é literal).
