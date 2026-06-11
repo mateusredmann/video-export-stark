@@ -9,7 +9,7 @@ Editor termina um lote → roda `/video-export` (ou `/video-export-task <id|url|
 1. Varre pasta-raiz local (ou desce do ClickUp pro filesystem no modo alvo-único).
 2. Empareha vídeo + (opcional) capa pelo nome-raiz. Cliente+data extraídos do nome da pasta-alvo (`<DD-MM> <Cliente>`); ano da pasta-avó (`<ano> - <Mês>`). Variantes `-SEM.mp4` descartadas.
 3. Localiza subtarefa no ClickUp por cliente+data (ou pelo `task_id` direto).
-4. Sobe pro **Drive Compartilhado da Stark** via rclone (`--drive-team-drive`, sem cap de 10MB). Destino default: `<cliente>/01. Cronograma de Reels | <cliente>/<DD-MM-YYYY>/`. Só entrega pra cliente que já tem pasta-raiz e pasta-âncora oficiais lá.
+4. Sobe pro **Drive Compartilhado da Stark** via rclone (`--drive-team-drive`, sem cap de 10MB). Destino default (v1.5): `clientes/<cliente_drive>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/`. 4 wrappers preexistentes (`clientes`, `<cliente_drive>`, `Cronograma de Conteúdo`, `artes`) — skill nunca cria nenhum deles. Só entrega pra cliente que já tem pasta-raiz e pasta-âncora oficiais.
 5. Comenta link da pasta + @ responsável + status = `edição concluída`.
 
 Sem Figma. Cada editor usa seu próprio app de edição.

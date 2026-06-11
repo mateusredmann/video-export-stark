@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\validate-rclone-path.ps1\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__clickup__clickup_create_task_comment|mcp__clickup__clickup_update_task|mcp__2d24fa11-1001-4c98-bf3c-7dcc3b7bdfaf__clickup_create_task_comment|mcp__2d24fa11-1001-4c98-bf3c-7dcc3b7bdfaf__clickup_update_task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PROJECT_DIR}\\.claude\\hooks\\validate-clickup-task.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}

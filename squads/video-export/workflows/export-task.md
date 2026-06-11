@@ -58,12 +58,14 @@ Detecção do tipo de argumento + algoritmos de parse documentados em [`.claude/
    Regex (em ordem): DD[-/.]MM[-/.](\d{4}) → DD-MM-YYYY | DD[-/.]MM[-/.](\d{2}) → DD-MM-AA (expande) | DD[-/.]MM → DD-MM (ano do path; fallback corrente).
    Cliente = fonte com token de data + extensão removidos, whitespace colapsado.
    Falha → erro fatal "renomeie como 'DD-MM Cliente.mp4' ou passe --task-id".
-4. Match forward (igual ao /video-export):
+4. Match forward (igual ao /video-export, v1.5):
      a. normalize(cliente) + aplica clickup_alias do clientes.yaml
-     b. clickup_search "<cliente_norm> <DD-MM>" + ranking
-     c. 0 matches → erro fatal sugerindo top-5 mais próximos
-     d. >1 empate → prompt interativo (subtask_id + parent.name)
-     e. clickup_get_task(parent).assignees → parent_assignees
+     b. clickup_search "<cliente_norm> <DD-MM>" + scoring v1.5 (cliente em path +3, data em nome +3, data em due_date +2, kw +1, cliente em subtask.name +1)
+     c. 0 matches OU melhor score < 6 → erro fatal `evidencia_insuficiente` com top-5 mais próximos
+     d. Sanity check pós-escolha: cliente em parent/folder/list E data em subtask.name OU due_date. Falha → erro fatal `sanity_falhou`
+     e. >1 empate (mesmo score) → prompt interativo (subtask_id + parent.name + subtask.name + score). NUNCA top-1 silencioso.
+     f. clickup_get_task(parent).assignees → parent_assignees
+     g. Escreve lock file (%TEMP%\video-export-task-lock.json) com subtask_id aprovado
 5-8. Up → Drive MCP → Noti sequencial → relatório (igual ao reverso).
 ```
 

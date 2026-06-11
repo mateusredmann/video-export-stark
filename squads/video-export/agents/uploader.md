@@ -10,11 +10,11 @@ Recebe par já resolvido por Match e garante que vídeo + (se houver) capa chegu
 
 > 🚨 **Drive Compartilhado da Stark, nunca Meu Drive.** Todo comando rclone roda com `<TD>` = `--drive-team-drive <config.rcloneTeamDriveId>` (default `0ABl2cpta6dNRUk9PVA`).
 
-> 📌 **Hierarquia padrão (v1.4):**
+> 📌 **Hierarquia padrão (v1.5):**
 > ```
-> gdrive:clientes/<cliente_drive>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/
+> gdrive:clientes/<cliente_drive>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/
 > ```
-> A skill **NUNCA cria** `clientes/`, `<cliente_drive>/` nem `cronograma de conteúdo/` — esses três têm que existir no shared drive (criados manualmente no onboarding do cliente). **CRIA sob demanda** apenas `<ano>/`, `<mes_extenso>/` e `<DD-MM-YYYY>/`. Wrappers ausentes → `failed`, nunca cria.
+> A skill **NUNCA cria** `clientes/`, `<cliente_drive>/`, `Cronograma de Conteúdo/` nem `artes/` — esses quatro têm que existir no shared drive (criados manualmente no onboarding do cliente, e `artes/` recriado pelo gestor a cada virada de ano). **CRIA sob demanda** apenas `<ano>/`, `<mes_extenso>/` e `<DD-MM-YYYY>/`. Wrappers ausentes → `failed`, nunca cria.
 
 ## Input
 ```yaml
@@ -46,7 +46,7 @@ force: false
 
 ### 0. Gate: wrappers preexistentes (NUNCA cria)
 
-Pra cada um dos 3 wrappers (`clientes`, `<cliente_drive>`, `cronograma de conteúdo`):
+Pra cada um dos 4 wrappers preexistentes (`clientes`, `<cliente_drive>`, `Cronograma de Conteúdo`, `artes`):
 
 1. Listar irmãos do nível atual:
    ```powershell
@@ -54,13 +54,16 @@ Pra cada um dos 3 wrappers (`clientes`, `<cliente_drive>`, `cronograma de conte�
    ```
 2. **Match exato normalizado** primeiro: `normalize(nome_pasta) == normalize(alvo)`. Se achar, usa o nome real (preserva case/acento do Drive).
 3. **Fallback fuzzy** se nenhum exato:
-   - Pra `cronograma de conteúdo`: pasta cujo nome normalizado contém `"cronograma"` + `"conteudo"`. Empate → primeira alfabética + warning.
+   - Pra `Cronograma de Conteúdo`: pasta cujo nome normalizado contém `"cronograma"` + `"conteudo"`. Empate → primeira alfabética + warning.
    - Pra `<cliente_drive>`: pasta cujo nome normalizado contém o cliente normalizado (substring). Empate → primeira que ranquear melhor por levenshtein vs alvo + warning.
    - Pra `clientes`: pasta cujo nome normalizado seja `"clientes"` exato (sem fuzzy — wrapper raiz é literal). Inexistente → `failed`.
-4. **Sem match** → `failed` com motivo:
+   - Pra `artes`: pasta cujo nome normalizado seja `"artes"` exato (sem fuzzy — wrapper literal). Inexistente → `failed`.
+4. **`<ano>/` (criável, fica ENTRE `Cronograma de Conteúdo/` e `artes/`):** depois do gate de `Cronograma de Conteúdo/`, listar e checar `<ano>/`. Match exato (`"2026"`) → reusa. Match fuzzy (`"Ano 2026"`, `"2026/"`) → reusa + warning. Ausente → `rclone mkdir <ano_canônico>` (4 dígitos). Continua pro gate de `artes/`.
+5. **Sem match** em qualquer wrapper preexistente → `failed` com motivo:
    - `wrapper_clientes_ausente` (raiz do shared drive sem `clientes/`)
    - `cliente_sem_pasta_no_drive` (`clientes/<cliente>/` inexistente)
-   - `cronograma_de_conteudo_ausente` (`clientes/<cliente>/cronograma de conteúdo/` inexistente)
+   - `cronograma_de_conteudo_ausente` (`clientes/<cliente>/Cronograma de Conteúdo/` inexistente)
+   - `artes_ausente` (`<ano>/artes/` inexistente — gestor precisa criar quando arranca o ano)
 
 > **Modo override** (`drive_pasta_reels_id` no YAML): pula o gate todo e usa o folder-id como pasta-âncora. Validar que o id resolve dentro do shared drive (`rclone lsf "<remote>:" --drive-root-folder-id <id> <TD> --max-depth 1`). Inválido → `failed`.
 
@@ -71,10 +74,10 @@ Consulta `clientes.yaml` pelo nome extraído pelo Scanner. Se houver entrada com
 ### 2. Hierarquia destino — modo padrão
 
 ```
-<wrapper_clientes_real>/<cliente_drive_real>/<wrapper_cronograma_real>/<ano>/<mes_extenso>/<DD-MM-YYYY>/
+<wrapper_clientes_real>/<cliente_drive_real>/<wrapper_cronograma_real>/<ano>/<wrapper_artes_real>/<mes_extenso>/<DD-MM-YYYY>/
 ```
 
-Onde os `_real` vêm do gate (nome exato encontrado no Drive, com case/acento preservados).
+Onde os `_real` vêm do gate (nome exato encontrado no Drive, com case/acento preservados). `<wrapper_artes_real>` tipicamente é `"artes"` lowercase mas pode aparecer como `"Artes"` no Drive — preserva o que o gate achou.
 
 **`<ano>` e `<mes_extenso>` (criáveis):**
 
@@ -166,14 +169,14 @@ falhas: []
 modo: "padrão" | "override-reels-id"
 transport: "rclone"
 criados: ["2026", "junho", "19-06-2026"]    # subpastas criadas no run (info pro relatório)
-fuzzy: ["cronograma de conteúdo → Cronograma de Conteudo"]   # warnings de match não-exato
+fuzzy: ["Cronograma de Conteúdo → Cronograma de Conteudo"]   # warnings de match não-exato
 ```
 
 ## Regras
 
 - **rclone obrigatório.** CLI fora do PATH ou remote ausente → aborta o par pedindo `/video-export --setup-rclone`. NÃO cai pro Drive MCP (quebra > 10MB).
 - **`<TD>` em TODO comando.** Sem ele, upload vai pro Meu Drive pessoal. Se `config.rcloneTeamDriveId` faltar, usar default `0ABl2cpta6dNRUk9PVA` do `squad.yaml`.
-- **3 wrappers preexistentes** (`clientes/`, `<cliente_drive>/`, `cronograma de conteúdo/`). NÃO cria nenhum dos três. Ausente → `failed` com motivo específico.
+- **4 wrappers preexistentes** (`clientes/`, `<cliente_drive>/`, `Cronograma de Conteúdo/`, `artes/`). NÃO cria nenhum dos quatro. Ausente → `failed` com motivo específico.
 - **Só ano, mês e dia são criáveis** no modo padrão. Modo override: subpath inteiro é criável (a âncora vira a fronteira).
 - **Match exato normalizado prioritário; fuzzy é fallback.** Toda vez que cair no fuzzy, registrar warning no output (`fuzzy[]`) pra o operator detectar inconsistências de nomenclatura no Drive.
 - **Capa opcional.** Vídeo sem capa local → sobe só vídeo, status `ok`. Capa local presente mas falhou no upload → `partial`.

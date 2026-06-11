@@ -34,7 +34,7 @@ NUNCA `clickup_create_task_comment` + `clickup_update_task` em paralelo na mesma
 - **Estrutura local:** `<videoRoot>\<ano>\<ano> - <Mês>\<DD-MM> <Cliente>\<arquivos>`. Cliente+data são extraídos do **nome da pasta-alvo** (`^(\d{2})-(\d{2})\s+(.+)$`); ano vem da pasta-avó. Pasta que não bate o regex é silenciosamente pulada.
 - **Variantes `-SEM.mp4`** (sem-legenda) são silenciosamente descartadas pelo Scanner.
 - **Capa é opcional.** Vídeo sem `.png` correspondente sobe só o vídeo — não vira pendência.
-- **Estrutura no Drive (default):** `<cliente>/01. Cronograma de Reels | <cliente>/<DD-MM-YYYY>/`. Clientes ficam direto na raiz do shared drive — **sem wrapper `Clientes/`**. Override por cliente via `drive_pasta_reels_id` + `drive_reels_subpath_template` no `clientes.yaml`.
+- **Estrutura no Drive (default, v1.5):** `clientes/<cliente_drive>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/`. **4 wrappers preexistentes** (`clientes/`, `<cliente_drive>/`, `Cronograma de Conteúdo/`, `artes/`) — NUNCA criados pela skill. Só `<ano>`, `<mes_extenso>` e `<DD-MM-YYYY>` são criáveis sob demanda. Override por cliente via `drive_pasta_reels_id` + `drive_reels_subpath_template` no `clientes.yaml`.
 - **Match reverso** (`/video-export-task <id>`): cliente vem por `folder.name` → `parent.name` → regex no `subtask.name`. Data: regex no `subtask.name` → `due_date` da subtarefa → da mãe.
 - **Modo path** (`/video-export-task <caminho>`): cliente+data extraídos do filename → nome da pasta → path ascendente (`2026/2026 - Junho/16-06 Janete`). Falha → erro fatal pedindo rename.
 - **Compactação:** após cada API call (ClickUp, Drive, rclone lsjson), agentes mantêm só o subset usado a jusante.

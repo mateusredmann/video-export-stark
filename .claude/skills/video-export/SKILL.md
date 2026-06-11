@@ -4,14 +4,15 @@ description: |
   Entrega vídeos editados da Stark Marketing — varre pasta-raiz local do editor,
   empareha vídeo+capa pelo nome-raiz, sobe pro Google Drive na hierarquia padrão
   (com overrides por cliente), comenta o link da pasta na subtarefa do ClickUp
-  com @-mention do responsável e move pra "edição concluída". Sem Figma — só delivery.
+  com @-mention do responsável e move pra "edição concluída". Hierarquia v1.5:
+  clientes/<Dr. X>/Cronograma de Conteúdo/<ano>/artes/<mes>/<DD-MM-YYYY>/. Sem Figma — só delivery.
   Acionar SEMPRE que o usuário pedir: "sobe os vídeos editados", "entrega de vídeo",
   "exporta os reels da semana", "joga os vídeos do [cliente] pro Drive", "fecha as
   edições do dia", "/video-export", ou qualquer variação de delivery final pós-edição.
   NÃO usar para: edição de vídeo em si (corte, color grade), geração de capa,
   upload de arte estática (use entrega-reels-drive-clickup ou figma-export-para-drive
   pra esses casos).
-version: 1.4.0
+version: 1.5.0
 author: stark.marketing
 license: UNLICENSED
 tags: [video, delivery, clickup, google-drive, rclone, stark]
@@ -57,7 +58,7 @@ Config em `%USERPROFILE%\.stark-video-export\config.json` (v3). Se ausente ou `-
 3. Extensão vídeo (default `.mp4`)
 4. Extensão capa (default `.png`)
 5. @-mention responsável? (default `sim`)
-6. **rclone** — checa CLI, guia install (winget/brew/install.sh), configura remote `gdrive:` via `rclone config` (responder **N** em "Configure as Shared Drive"), valida com `rclone lsd gdrive: --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1` (raiz do shared drive contém os clientes diretamente — sem wrapper `Clientes/`). Detalhes em [`tasks/onboarding.md`](../../../squads/video-export/tasks/onboarding.md) §6.
+6. **rclone** — checa CLI, guia install (winget/brew/install.sh), configura remote `gdrive:` via `rclone config` (responder **N** em "Configure as Shared Drive"), valida com `rclone lsd gdrive: --drive-team-drive 0ABl2cpta6dNRUk9PVA --max-depth 1` (raiz do shared drive contém a pasta `clientes/` — dentro dela ficam os clientes oficiais). Detalhes em [`tasks/onboarding.md`](../../../squads/video-export/tasks/onboarding.md) §6.
 
 Config:
 ```json
@@ -73,7 +74,7 @@ Config:
 >
 > 🚨 **rclone obrigatório:** Drive MCP rejeita uploads > 10MB. Vídeos editados quase sempre passam disso.
 >
-> 📌 **Sem wrapper `Clientes/`.** Clientes ficam direto na raiz do shared drive. A spec antiga apontava pra `Clientes/<cli>/Cronograma de Conteudo/Artes/<ano>/<mes>/<DD-MM-YYYY>/` (estrutura de artes do `prep-agenda-stark`) — não se aplica a vídeos.
+> 📌 **Hierarquia v1.5:** `clientes/<Dr. X>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/`. Os 4 wrappers preexistentes (`clientes`, `<Dr. X>`, `Cronograma de Conteúdo`, `artes`) NUNCA são criados pela skill — só `<ano>`, `<mes_extenso>` e `<DD-MM-YYYY>`.
 
 ## 4. Pipeline
 
@@ -108,11 +109,15 @@ Config:
 
 ## 6. Estrutura no Drive
 
-**Default (zero-config):**
+**Default (zero-config) — hierarquia v1.5:**
 ```
-<drive_nome OR cliente>/01. Cronograma de Reels | <drive_nome OR cliente>/<DD-MM-YYYY>/
+clientes/<drive_nome OR cliente>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/
 ```
-Ex.: `gdrive:Dr Diego Gonzalez/01. Cronograma de Reels | Dr Diego Gonzalez/19-06-2026/19-06 Diego Gonzalez.mp4`.
+Ex.: `gdrive:clientes/Dr Diego Gonzalez/Cronograma de Conteúdo/2026/artes/junho/19-06-2026/19-06 Diego Gonzalez.mp4`.
+
+**4 wrappers preexistentes (NUNCA criar):** `clientes/`, `<drive_nome OR cliente>/`, `Cronograma de Conteúdo/`, `artes/`. Os três primeiros são criados no onboarding do cliente; `artes/` é criado pelo gestor quando arranca cada ano novo. Wrapper ausente → `failed` (motivo específico: `wrapper_clientes_ausente`, `cliente_sem_pasta_no_drive`, `cronograma_de_conteudo_ausente`, `artes_ausente`).
+
+**Criáveis sob demanda:** `<ano>/`, `<mes_extenso>/`, `<DD-MM-YYYY>/`.
 
 **Override por cliente** (`clientes.yaml`):
 ```yaml
@@ -121,7 +126,7 @@ Ex.: `gdrive:Dr Diego Gonzalez/01. Cronograma de Reels | Dr Diego Gonzalez/19-06
 
 "Dr. Foo":
   drive_pasta_reels_id: "<folderId>"       # pasta-âncora alternativa
-  drive_reels_subpath_template: "{ano}/{MMMAA}/{DD-MM-YYYY}"   # default: "{DD-MM-YYYY}"
+  drive_reels_subpath_template: "{ano}/artes/{mes_extenso}/{DD-MM-YYYY}"   # default: alinhado com a hierarquia padrão
 ```
 
 Tokens do template: `{ano}`, `{mes}` (2 dígitos), `{mes_extenso}` (`junho`), `{MMMAA}` (`JUN26`), `{DD-MM}`, `{DD-MM-YYYY}`. Template vazio = arquivos sobem direto na âncora.
@@ -137,10 +142,10 @@ Input: `videoRoot`, `videoExt`, `capaExt`, `escopo={modo, pasta?, cliente?}`. Mo
 **Read-only**. Modo forward (input `cliente`+`data`): normaliza (remove `Dr.`/`Dra.`, lowercase, sem acento, trim) → aplica `clickup_alias` do `clientes.yaml` → `clickup_search "<cliente_norm> <DD-MM>"` → ranking (cliente bate no path da lista; data no nome `DD-MM|DD/MM|DD-MM-YYYY|DD-MM-AA`; bônus por "edição/vídeo/reels"). 0 match → pendência. Lê `parent.assignees` pra @-mention. Modo reverso (input `task_id`) e modo path documentados em [`workflows/export-task.md`](../../../squads/video-export/workflows/export-task.md).
 
 ### Up ([uploader.md](../../../squads/video-export/agents/uploader.md))
-Consulta `clientes.yaml`. **Gate (antes de mkdir/copyto):** `rclone lsf "<remote>:<drive_nome OR cliente>" <TD> --dirs-only --max-depth 1` — pasta-raiz ausente no shared drive → `failed`, **NUNCA** cria a raiz. Modo override: validar `drive_pasta_reels_id` resolve dentro do shared drive.
+Consulta `clientes.yaml`. **Gate em cascata (antes de mkdir/copyto):** lista 4 wrappers preexistentes (`clientes` → `<drive_nome OR cliente>` → `Cronograma de Conteúdo` → `artes` dentro do `<ano>`) com `rclone lsf "<remote>:<path>" <TD> --dirs-only --max-depth 1`. Qualquer um ausente → `failed`, **NUNCA** cria wrapper. `<ano>/` é o único nível criável no meio da cascata. Modo override: validar `drive_pasta_reels_id` resolve dentro do shared drive.
 
 **Hierarquia destino:**
-- Padrão: `<drive_nome OR cliente>/01. Cronograma de Reels | <drive_nome OR cliente>/<DD-MM-YYYY>/`
+- Padrão: `clientes/<drive_nome OR cliente>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/`
 - Override (`drive_pasta_reels_id`): `<startFolderId>/<subpath via drive_reels_subpath_template>/`
 
 **Idempotência:** `rclone lsjson "<remote>:<path>" <TD> --files-only` → compara `Name`+`Size`. Match exato → `skipped`. Diferente sem `--force` → pula com warning. Com `--force` → sobrescreve.
@@ -198,8 +203,10 @@ Clientes sem entrada usam modo padrão automaticamente.
 
 | Sintoma | Ação |
 |---|---|
-| Pasta `<drive_nome>/` não existe no shared drive | `failed`, pendência. NUNCA cria a raiz. |
-| Pasta-âncora `01. Cronograma de Reels \| <cli>` ausente | `failed`. Pasta deve ser criada no onboarding do cliente, fora desta skill. |
+| `clientes/` ausente na raiz do shared drive | `failed` (`wrapper_clientes_ausente`). NUNCA cria. |
+| Pasta `<drive_nome>/` ausente dentro de `clientes/` | `failed` (`cliente_sem_pasta_no_drive`). Criar no onboarding do cliente. |
+| `Cronograma de Conteúdo/` ausente dentro do cliente | `failed` (`cronograma_de_conteudo_ausente`). Criar no onboarding. |
+| `<ano>/artes/` ausente (virada de ano) | `failed` (`artes_ausente`). Gestor cria a pasta `artes/` dentro do ano novo. |
 | `drive_pasta_reels_id` inválido / fora do shared drive | `failed`, pede update do YAML. |
 | `--drive-team-drive` ausente | Bug — sempre passar. Default `0ABl2cpta6dNRUk9PVA`. |
 | Pasta-local sem capa `.png` | Sobe só vídeo. Status `ok`. NÃO é pendência. |

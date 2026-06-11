@@ -1,16 +1,21 @@
 # Video Export — Overrides por cliente
 #
 # A maioria dos clientes NÃO precisa de override. O Up (uploader) usa a hierarquia padrão:
-#   clientes/<cliente_drive>/cronograma de conteúdo/<ano>/<mes_extenso>/<DD-MM-YYYY>/
+#   clientes/<cliente_drive>/Cronograma de Conteúdo/<ano>/artes/<mes_extenso>/<DD-MM-YYYY>/
 #
-# Os três primeiros níveis (clientes/, <cliente_drive>/, cronograma de conteúdo/) são
-# preexistentes — Uploader faz fuzzy match normalizado pra achar o nome real no Drive
-# (preserva case/acento original), mas NUNCA cria. Só <ano>/, <mes_extenso>/ e
-# <DD-MM-YYYY>/ são criáveis sob demanda.
+# QUATRO níveis são preexistentes (Uploader NUNCA cria):
+#   1. clientes/                  (raiz do shared drive, manual)
+#   2. <cliente_drive>/           (criado no onboarding do cliente)
+#   3. Cronograma de Conteúdo/    (criado no onboarding do cliente)
+#   4. artes/                     (criado pelo gestor quando arranca cada <ano>)
+#
+# Uploader faz fuzzy match normalizado pra achar o nome real no Drive (preserva
+# case/acento original), mas NUNCA cria nenhum dos quatro. Só <ano>/, <mes_extenso>/
+# e <DD-MM-YYYY>/ são criáveis sob demanda.
 #
 # Use este arquivo quando algum cliente:
 #   1. Tem pasta no Drive com nome diferente do que o Scanner extrai do nome da pasta-local
-#   2. Tem pasta-âncora de reels em local não-padrão (não em "clientes/<cli>/cronograma de conteúdo/")
+#   2. Tem pasta-âncora de reels em local não-padrão (não em "clientes/<cli>/Cronograma de Conteúdo/<ano>/artes/")
 #   3. Tem nome no ClickUp diferente do nome do cliente extraído pelo Scanner
 #
 # CAMPOS DISPONÍVEIS:
@@ -19,12 +24,12 @@
 #                                 no Drive a pasta é "Dr Diego Gonzalez".
 #                                 Uploader faz fuzzy match em "clientes/" usando esse alvo.
 #
-#   drive_pasta_reels_id:         ID da pasta-âncora dos reels (skip o gate dos 3 wrappers padrão).
+#   drive_pasta_reels_id:         ID da pasta-âncora dos reels (skip o gate dos 4 wrappers padrão).
 #                                 Use quando o cliente tem reels num lugar não-padrão.
 #                                 No modo override TODO o subpath dentro da âncora é criável.
 #
 #   drive_reels_subpath_template: Template do subpath DENTRO da âncora.
-#                                 Default: "{ano}/{mes_extenso}/{DD-MM-YYYY}" (alinhado com a hierarquia padrão).
+#                                 Default: "{ano}/artes/{mes_extenso}/{DD-MM-YYYY}" (alinhado com a hierarquia padrão).
 #                                 Tokens: {ano}, {mes} (2 dígitos), {mes_extenso} (junho), {MMMAA} (JUN26),
 #                                         {DD-MM}, {DD-MM-YYYY}.
 #                                 Vazio ("") → sobe direto na âncora sem subpasta.
@@ -56,10 +61,11 @@ clientes:
 # Clientes sem entrada aqui caem no modo padrão:
 #   wrapper raiz   = "clientes" (fuzzy exato normalizado)
 #   pasta-cliente  = nome extraído pelo Scanner (fuzzy normalizado)
-#   pasta-âncora   = "cronograma de conteúdo" (fuzzy normalizado, aceita variantes legadas)
-#   subpath        = "{ano}/{mes_extenso}/{DD-MM-YYYY}" (criável sob demanda)
+#   pasta-cronograma = "Cronograma de Conteúdo" (fuzzy normalizado, aceita variantes legadas)
+#   pasta-artes    = "artes" (fuzzy exato normalizado, sem variantes)
+#   subpath criável = "{ano}/artes/{mes_extenso}/{DD-MM-YYYY}" (sub-pasta "artes" é gate, não criável)
 #
-# Se a busca falhar (qualquer um dos 3 wrappers ausente OU subtarefa não encontrada),
+# Se a busca falhar (qualquer um dos 4 wrappers ausente OU subtarefa não encontrada),
 # vai pra pendências — Uploader e Matcher NUNCA criam wrapper preexistente nem task nova.
 
 # Entradas legadas do prep-agenda-stark (estrutura de artes — não aplicável a vídeos)

@@ -11,21 +11,24 @@ Implementado pelo agente Up. Algoritmo completo em [agents/uploader.md](../agent
 
 Todo comando rclone roda com `--drive-team-drive <config.rcloneTeamDriveId>` (default `squad.yaml` = `0ABl2cpta6dNRUk9PVA`). Sem esse flag o rclone cria pastas no Meu Drive pessoal do editor — bug conhecido, corrigido na v1.3. Nos exemplos abaixo, `<TD>` = `--drive-team-drive 0ABl2cpta6dNRUk9PVA`.
 
-## Hierarquia destino — modo padrão (v1.4)
+## Hierarquia destino — modo padrão (v1.5)
 
 ```
 Drive Compartilhado (raiz)
 └── clientes/                                ← preexistente, fuzzy match exato normalizado
     └── <cliente_drive>/                     ← preexistente, fuzzy match (drive_nome | cliente)
-        └── cronograma de conteúdo/          ← preexistente, fuzzy match
+        └── Cronograma de Conteúdo/          ← preexistente, fuzzy match
             └── <ano>/                       ← CRIA se ausente (ex.: 2026)
-                └── <mes_extenso>/           ← CRIA se ausente (ex.: junho)
-                    └── <DD-MM-YYYY>/        ← CRIA se ausente (ex.: 19-06-2026)
-                        ├── <nome_raiz>.mp4
-                        └── <nome_raiz>.png  (opcional)
+                └── artes/                   ← preexistente, fuzzy match
+                    └── <mes_extenso>/       ← CRIA se ausente (ex.: junho)
+                        └── <DD-MM-YYYY>/    ← CRIA se ausente (ex.: 19-06-2026)
+                            ├── <nome_raiz>.mp4
+                            └── <nome_raiz>.png  (opcional)
 ```
 
-Ex.: `gdrive:clientes/Dr Diego Gonzalez/cronograma de conteúdo/2026/junho/19-06-2026/19-06 Diego Gonzalez.mp4`.
+Ex.: `gdrive:clientes/Dr Diego Gonzalez/Cronograma de Conteúdo/2026/artes/junho/19-06-2026/19-06 Diego Gonzalez.mp4`.
+
+> 📌 **`artes/` é o 4º wrapper preexistente** (entre `<ano>` e `<mes_extenso>`). A pasta `<ano>/artes/` é criada manualmente pelo gestor quando o ano arranca — a skill NUNCA cria `artes/`. Se a skill criar um `<ano>/` novo (ex.: virada de ano) e não houver `<ano>/artes/` ainda → `failed` com motivo `artes_ausente`, operator cria a pasta e re-roda.
 
 ## Regra de criação seletiva
 
@@ -33,8 +36,9 @@ Ex.: `gdrive:clientes/Dr Diego Gonzalez/cronograma de conteúdo/2026/junho/19-06
 |-----------------------------|------------------|---------------------------------------------------------------------|
 | `clientes/`                 | **NÃO**          | `failed` (`wrapper_clientes_ausente`) — manual no shared drive      |
 | `<cliente_drive>/`          | **NÃO**          | `failed` (`cliente_sem_pasta_no_drive`) — criada no onboarding      |
-| `cronograma de conteúdo/`   | **NÃO**          | `failed` (`cronograma_de_conteudo_ausente`) — criada no onboarding  |
+| `Cronograma de Conteúdo/`   | **NÃO**          | `failed` (`cronograma_de_conteudo_ausente`) — criada no onboarding  |
 | `<ano>/`                    | **SIM** (sob demanda) | `rclone mkdir <ano>` (ex.: `2026`)                            |
+| `artes/`                    | **NÃO**          | `failed` (`artes_ausente`) — gestor cria quando o ano arranca       |
 | `<mes_extenso>/`            | **SIM** (sob demanda) | `rclone mkdir <mes_extenso>` (ex.: `junho`)                   |
 | `<DD-MM-YYYY>/`             | **SIM** (sempre) | `rclone mkdir <DD-MM-YYYY>` (idempotente — reusa se existir)        |
 
@@ -44,15 +48,17 @@ Antes do gate, consultar `squads/video-export/config/clientes.yaml` pelo nome do
 
 ## Gate fuzzy (preexistentes, em cascata)
 
-Pra cada wrapper preexistente, em ordem (`clientes/` → `<cliente_drive>/` → `cronograma de conteúdo/`):
+Pra cada wrapper preexistente, em ordem (`clientes/` → `<cliente_drive>/` → `Cronograma de Conteúdo/` → `<ano>/` → `artes/`):
 
 1. `rclone lsf "<remote>:<path_atual>" <TD> --dirs-only --max-depth 1` lista irmãos.
 2. **Match exato normalizado** primeiro: `normalize(nome) == normalize(alvo)`. Encontrou → usa o nome real (preserva case/acento do Drive). Continua pro próximo nível.
 3. **Fallback fuzzy** se nenhum exato:
    - `clientes`: nenhum fuzzy — exige `normalize(nome) == "clientes"`. Ausente → `failed`.
    - `<cliente_drive>`: substring do cliente normalizado no nome da pasta. Empate → melhor ranking por levenshtein. Registra warning em `fuzzy[]`.
-   - `cronograma de conteúdo`: pasta cujo nome normalizado contém `"cronograma"` + `"conteudo"`. Aceita variantes do legado (ex.: `"Cronograma de Conteudo"`, `"Cronograma de Conteúdo"`, `"01. Cronograma de Conteúdo"`). Registra warning em `fuzzy[]`.
-4. Nenhum match (exato nem fuzzy) → `failed` com motivo específico, sem criar nada.
+   - `Cronograma de Conteúdo`: pasta cujo nome normalizado contém `"cronograma"` + `"conteudo"`. Aceita variantes do legado (ex.: `"Cronograma de Conteudo"`, `"Cronograma de Conteúdo"`, `"01. Cronograma de Conteúdo"`). Registra warning em `fuzzy[]`.
+   - `artes`: pasta cujo nome normalizado é exatamente `"artes"` (sem fuzzy — wrapper literal). Variantes aceitas: `"Artes"`, `"ARTES"`. Empate impossível. Ausente → `failed` (`artes_ausente`).
+4. **`<ano>/` (criável)**: se ausente, `rclone mkdir <ano_canônico>` (4 dígitos). NÃO bloqueia o gate.
+5. Nenhum match (exato nem fuzzy) em qualquer wrapper preexistente → `failed` com motivo específico, sem criar nada.
 
 `normalize(s)` = lowercase → strip diacríticos (NFD), preservando `ç`→`c` → remove pontuação trivial → collapse whitespace → trim.
 
@@ -173,7 +179,8 @@ Capa null → segundo `copyto` é pulado (não é falha).
 | `rclone copyto` exit 5 (rate-limit / transitório)     | 1 retry com backoff 5s, depois falha do par               |
 | `clientes/` ausente na raiz do shared drive (modo padrão) | `failed` → `wrapper_clientes_ausente`, criar manualmente |
 | Pasta `<cliente_drive>/` ausente dentro de `clientes/` (modo padrão) | `failed` → `cliente_sem_pasta_no_drive`, criar no onboarding do cliente |
-| `cronograma de conteúdo/` ausente dentro do cliente (modo padrão) | `failed` → `cronograma_de_conteudo_ausente`, criar no onboarding |
+| `Cronograma de Conteúdo/` ausente dentro do cliente (modo padrão) | `failed` → `cronograma_de_conteudo_ausente`, criar no onboarding |
+| `<ano>/artes/` ausente (modo padrão, virada de ano) | `failed` → `artes_ausente`, gestor cria a pasta `artes/` dentro do ano novo |
 | `drive_pasta_reels_id` inválido / fora do shared drive (modo override) | Falha imediata — pedir atualização do clientes.yaml       |
 | `drive_pasta_ano_id` ainda referenciado pra vídeos                      | Ignorado — é campo legado de artes. Use `drive_pasta_reels_id` |
 | `--drive-team-drive` ausente / id errado              | Pastas iam parar no Meu Drive — sempre passar `<rcloneTeamDriveId>` do config/squad.yaml |
