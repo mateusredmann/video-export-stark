@@ -1,11 +1,12 @@
 ﻿#Requires -Version 5.1
 # PreToolUse hook - bloqueia clickup_create_task_comment / clickup_update_task em
 # task_ids que NAO foram aprovados pelo matcher da skill video-export-stark.
-# Le %TEMP%\video-export-task-lock.json (escrito pelo Matcher).
+# Le <cacheDir>\video-export-task-lock.json (escrito pelo Matcher) — cacheDir =
+# %USERPROFILE%\.stark-video-export (mesmo do .sh em ~/.stark-video-export/).
 # Exit 0 = libera, exit 2 = bloqueia.
 
 $ErrorActionPreference = 'Stop'
-$LockPath = Join-Path $env:TEMP 'video-export-task-lock.json'
+$LockPath = Join-Path $env:USERPROFILE '.stark-video-export\video-export-task-lock.json'
 
 function Write-HookLog {
     param([string]$Message)

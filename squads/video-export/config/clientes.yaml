@@ -58,6 +58,16 @@ clientes:
   "Fernanda Marció":
     drive_nome: "Dra Fernanda Marció"
 
+  # Pasta-local "DD-MM Joel Abdala"; no Drive a pasta é "Dr Joel Abdala".
+  "Joel Abdala":
+    drive_nome: "Dr Joel Abdala"
+
+  # Pasta-local "DD-MM Leslye Sartori"; no Drive a pasta é o nome completo com prefixo "Dra".
+  # ⚠️ Existe uma pasta gêmea "Dra. Leslye Sartori Agostinho Iria" (com ponto) que é antiga e
+  # NÃO tem a âncora "01. Cronograma de Reels" — a canônica é a sem ponto.
+  "Leslye Sartori":
+    drive_nome: "Dra Leslye Sartori Agostinho Iria"
+
 # Clientes sem entrada aqui caem no modo padrão:
 #   wrapper raiz   = "clientes" (fuzzy exato normalizado)
 #   pasta-cliente  = nome extraído pelo Scanner (fuzzy normalizado)

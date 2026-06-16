@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "video-export-stark",
+  "displayName": "Video Export — Stark",
+  "version": "1.5.0",
+  "description": "Entrega vídeos editados da Stark Marketing → Google Drive (rclone) + ClickUp. Varre a pasta-raiz local do editor, empareha vídeo+capa, sobe pro Drive Compartilhado na hierarquia v1.5 (clientes/<cli>/Cronograma de Conteúdo/<ano>/artes/<mes>/<DD-MM-YYYY>/) e comenta o link na subtarefa do ClickUp com @-mention do responsável e status 'edição concluída'. Inclui modo alvo-único via /video-export-task.",
+  "author": {
+    "name": "Stark Marketing",
+    "email": "mateus.redmann@starkmkt.com"
+  },
+  "repository": "https://github.com/mateusredmann/video-export-stark",
+  "license": "UNLICENSED",
+  "keywords": ["video", "edicao", "clickup", "drive", "entrega", "stark", "rclone"],
+  "commands": ["./.claude/commands/"],
+  "skills": ["./.claude/skills/"],
+  "hooks": "./.claude/hooks/hooks.json"
+}

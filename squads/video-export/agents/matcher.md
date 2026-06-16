@@ -50,7 +50,7 @@ data: "19-06-2026"             # DD-MM da pasta + ano da pasta-avó
 
 8. `clickup_get_task(parent.id).assignees` → `parent_assignees`.
 
-9. **Lock file (NOVO — v1.5):** após match aprovado, escreve `%TEMP%\video-export-task-lock.json`:
+9. **Lock file (NOVO — v1.5):** após match aprovado, escreve em `<cacheDir>/video-export-task-lock.json` — mesmo `cacheDir` do `config.json` (Windows `%USERPROFILE%\.stark-video-export\`, macOS/Linux `~/.stark-video-export/`). Os hooks `validate-clickup-task.{sh,ps1}` leem exatamente esse caminho, então Matcher e hook PRECISAM concordar nele:
 
    ```json
    {
@@ -72,7 +72,7 @@ data: "19-06-2026"             # DD-MM da pasta + ano da pasta-avó
    }
    ```
 
-   Modo lote: array `entries[]` cresce a cada subtask aprovada. Hook `validate-clickup-task` lê este arquivo na PreToolUse de `clickup_create_task_comment` e `clickup_update_task` e bloqueia se o `task_id` da chamada não estiver listado. Lock file é **append-only durante a execução** (nunca remove entries) e **rotacionado** no início de cada `/video-export` ou `/video-export-task` (Eve faz `Remove-Item` antes do Match começar).
+   Modo lote: array `entries[]` cresce a cada subtask aprovada. Hook `validate-clickup-task` lê este arquivo na PreToolUse de `clickup_create_task_comment` e `clickup_update_task` e bloqueia se o `task_id` da chamada não estiver listado. Lock file é **append-only durante a execução** (nunca remove entries) e **rotacionado** no início de cada `/video-export` ou `/video-export-task` (Eve apaga o lock — `Remove-Item` no Windows, `rm -f` no macOS/Linux — antes do Match começar).
 
 ### Output
 ```yaml
@@ -87,7 +87,7 @@ score: 8                          # NOVO — score de match
 evidencias:                       # NOVO — onde cliente+data bateram
   cliente_em: "parent.name"
   data_em: "subtask.name"
-lock_file: "%TEMP%\\video-export-task-lock.json"   # NOVO — caminho do lock atualizado
+lock_file: "<cacheDir>/video-export-task-lock.json"   # NOVO — Win: %USERPROFILE%\.stark-video-export\ · mac/linux: ~/.stark-video-export/
 ```
 
 ## Modo reverso (`/video-export-task <task_id>`)
@@ -135,7 +135,7 @@ Saída inclui `mode: "path"`, `cliente_derivado` (raw do filename) e `cliente_re
 - **Cache por sessão:** `(cliente, data)` ou `task_id` já resolvido → reusa.
 - **Sem inferência criativa.** Sem match → pendência, NUNCA cria task nova.
 - **Read-only no ClickUp.** Quem escreve no ClickUp é Noti.
-- **Lock file é escrita local obrigatória.** Match precisa escrever em `%TEMP%\video-export-task-lock.json` antes de devolver `match: "ok"`. Sem lock = Noti bloqueado pelo hook `validate-clickup-task`.
+- **Lock file é escrita local obrigatória.** Match precisa escrever em `<cacheDir>/video-export-task-lock.json` (Win `%USERPROFILE%\.stark-video-export\`, mac/linux `~/.stark-video-export/`) antes de devolver `match: "ok"`. Sem lock = Noti bloqueado pelo hook `validate-clickup-task`.
 - **Threshold mínimo absoluto = 6** (cliente em path/folder/list + data exata em subtask.name OU due_date). Abaixo disso é sempre pendência, mesmo que seja a única candidata. Match com 0 candidatas ≠ erro: é `não encontrado`. Match com 1 candidata score < 6 = `evidencia_insuficiente`.
 - **Sanity check é gate, não decoração.** Score ≥ 6 mas sanity falha → `sanity_falhou` (pendência). Loga o motivo no relatório.
 - **Compactação:** após `clickup_search`, manter só `id`, `name`, `status.status`, `parent`, `due_date`, `folder.name`, `list.name` das candidatas (precisa de tudo isso pro sanity check).

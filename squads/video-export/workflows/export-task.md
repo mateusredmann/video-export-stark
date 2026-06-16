@@ -65,7 +65,7 @@ Detecção do tipo de argumento + algoritmos de parse documentados em [`.claude/
      d. Sanity check pós-escolha: cliente em parent/folder/list E data em subtask.name OU due_date. Falha → erro fatal `sanity_falhou`
      e. >1 empate (mesmo score) → prompt interativo (subtask_id + parent.name + subtask.name + score). NUNCA top-1 silencioso.
      f. clickup_get_task(parent).assignees → parent_assignees
-     g. Escreve lock file (%TEMP%\video-export-task-lock.json) com subtask_id aprovado
+     g. Escreve lock file (<cacheDir>/video-export-task-lock.json — Win %USERPROFILE%\.stark-video-export\, mac/linux ~/.stark-video-export/) com subtask_id aprovado
 5-8. Up → Drive MCP → Noti sequencial → relatório (igual ao reverso).
 ```
 

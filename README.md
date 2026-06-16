@@ -1,6 +1,28 @@
 # video-export-stark
 
 Squad de IA que automatiza a entrega de vídeos editados da Stark Marketing.
+**Este repositório é um plugin do Claude Code** — instalável direto via marketplace.
+
+## Instalação (colaboradores)
+
+Dentro do Claude Code, rode os dois comandos:
+
+```
+/plugin marketplace add mateusredmann/video-export-stark
+/plugin install video-export-stark@stark-marketing
+```
+
+Pronto. Os comandos `/video-export-stark:video-export` e `/video-export-stark:video-export-task`
+ficam disponíveis. Na 1ª execução a skill roda o onboarding (email ClickUp, pasta-raiz, rclone).
+
+> **Pré-requisitos na máquina do editor:** `python3` (usado pelos hooks de validação) e `rclone`
+> (o onboarding guia a instalação via `brew install rclone` no macOS). Os MCPs **ClickUp** e
+> **Google Drive** precisam estar conectados na conta do colaborador.
+
+> **Para o gerente de contas:** basta que este repo esteja no GitHub (branch `master`). O
+> `/plugin marketplace add` puxa o `master` por padrão. Para liberar uma versão específica,
+> aponte uma tag: `/plugin marketplace add mateusredmann/video-export-stark#v1.5.0`.
+> Atualizações: depois de novo push no `master`, os colaboradores rodam `/plugin marketplace update stark-marketing`.
 
 ## O que faz
 

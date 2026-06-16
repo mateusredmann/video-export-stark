@@ -1,0 +1,19 @@
+{
+  "name": "stark-marketing",
+  "description": "Marketplace de plugins internos da Stark Marketing para Claude Code.",
+  "owner": {
+    "name": "Stark Marketing",
+    "email": "mateus.redmann@starkmkt.com"
+  },
+  "plugins": [
+    {
+      "name": "video-export-stark",
+      "source": "./",
+      "description": "Entrega vídeos editados → Google Drive (rclone) + ClickUp: varre a pasta-raiz local, empareha vídeo+capa, sobe na hierarquia v1.5 e comenta o link na subtarefa do ClickUp com @-mention e status 'edição concluída'.",
+      "version": "1.5.0",
+      "license": "UNLICENSED",
+      "category": "workflow",
+      "keywords": ["video", "edicao", "clickup", "drive", "entrega", "stark", "rclone"]
+    }
+  ]
+}
