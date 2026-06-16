@@ -22,11 +22,18 @@ ficam disponíveis. Na 1ª execução a skill roda o onboarding (email ClickUp, 
 > **Para o gerente de contas:** basta que este repo esteja no GitHub (branch `master`). O
 > `/plugin marketplace add` puxa o `master` por padrão. Para liberar uma versão específica,
 > aponte uma tag: `/plugin marketplace add mateusredmann/video-export-stark#v1.5.0`.
-> Atualizações: depois de novo push no `master`, os colaboradores rodam `/plugin marketplace update stark-marketing`.
+>
+> **Atualizar depois de um novo push no `master`** (3 passos, sem reiniciar):
+> ```
+> /plugin marketplace update stark-marketing
+> /plugin install video-export-stark@stark-marketing
+> /reload-plugins
+> ```
+> (`marketplace update` só atualiza o catálogo; o `install` repuxa a versão nova; `reload-plugins` ativa na sessão.)
 
 ## O que faz
 
-Editor termina um lote → roda `/video-export` (ou `/video-export-task <id|url|caminho>`):
+Editor termina um lote → roda `/video-export-stark:video-export` (ou `/video-export-stark:video-export-task <id|url|caminho>`):
 
 1. Varre pasta-raiz local (ou desce do ClickUp pro filesystem no modo alvo-único).
 2. Empareha vídeo + (opcional) capa pelo nome-raiz. Cliente+data extraídos do nome da pasta-alvo (`<DD-MM> <Cliente>`); ano da pasta-avó (`<ano> - <Mês>`). Variantes `-SEM.mp4` descartadas.
@@ -48,27 +55,29 @@ Sem Figma. Cada editor usa seu próprio app de edição.
 
 ## Slash commands
 
+> Instalado como plugin, **todo comando leva o prefixo `video-export-stark:`** (namespacing obrigatório do Claude Code — bare `/video-export` não funciona).
+
 | Comando | Uso |
 |---|---|
-| `/video-export` | Varredura — default = `--hoje` após onboarding |
-| `/video-export --hoje \| --semana` | Filtro de data |
-| `/video-export "<pasta>"` | Só essa pasta literal |
-| `/video-export --cliente "Dr. X" \| --force \| --dry-run` | Filtros/flags |
-| `/video-export --reconfigure \| --setup-rclone` | Re-config |
-| `/video-export-task <task_id\|URL\|caminho>` | Alvo único — refazer uma entrega ou subir um item específico |
-| `/video-export guide` | Manual completo do repositório |
+| `/video-export-stark:video-export` | Varredura — default = `--hoje` após onboarding |
+| `/video-export-stark:video-export --hoje \| --semana` | Filtro de data |
+| `/video-export-stark:video-export "<pasta>"` | Só essa pasta literal |
+| `/video-export-stark:video-export --cliente "Dr. X" \| --force \| --dry-run` | Filtros/flags |
+| `/video-export-stark:video-export --reconfigure \| --setup-rclone` | Re-config |
+| `/video-export-stark:video-export-task <task_id\|URL\|caminho>` | Alvo único — refazer uma entrega ou subir um item específico |
+| `/video-export-stark:video-export guide` | Manual completo do repositório |
 
 ## Onboarding (1ª execução)
 
-A skill pergunta: email ClickUp, pasta-raiz, extensão vídeo/capa, @-mention sim/não, e configura **rclone** (etapa 6 detecta CLI, instala via winget/brew/install.sh, cria remote `gdrive:`). Config salva em `%USERPROFILE%\.stark-video-export\config.json` (v3).
+A skill pergunta: email ClickUp, pasta-raiz, extensão vídeo/capa, @-mention sim/não, e configura **rclone** (etapa 6 detecta CLI, instala via brew no macOS / winget no Windows / install.sh no Linux, cria remote `gdrive:`). Config salva em `~/.stark-video-export/config.json` (macOS/Linux) ou `%USERPROFILE%\.stark-video-export\config.json` (Windows) — schema v3.
 
-Re-config: `/video-export --reconfigure` (tudo) ou `/video-export --setup-rclone` (só etapa 6). Configs antigas migram sozinhas na próxima execução.
+Re-config: `/video-export-stark:video-export --reconfigure` (tudo) ou `/video-export-stark:video-export --setup-rclone` (só etapa 6). Configs antigas migram sozinhas na próxima execução.
 
 > 🚨 Upload mira o Drive Compartilhado da Stark (`rcloneTeamDriveId=0ABl2cpta6dNRUk9PVA`) via `--drive-team-drive`, não o Meu Drive pessoal. Só entrega pra cliente com pasta oficial nesse shared drive.
 
 ## Documentação
 
-- Manual completo: `/video-export guide` → [docs/MANUAL.md](squads/video-export/docs/MANUAL.md)
+- Manual completo: `/video-export-stark:video-export guide` → [docs/MANUAL.md](squads/video-export/docs/MANUAL.md)
 - [PRD completo](squads/video-export/docs/PRD.md) — todos os FRs
 - [squad.yaml](squads/video-export/squad.yaml) — metadata, MCPs, ferramentas externas
 - [Onboarding detalhado](squads/video-export/tasks/onboarding.md) — etapa 6 (rclone)
